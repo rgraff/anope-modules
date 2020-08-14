@@ -301,8 +301,6 @@ class RegistrationEndpoint
 		nsregister = conf->GetModule("ns_register")->Get<const Anope::string>("registration");
 
 		accessonreg = conf->GetModule("ns_access")->Get<bool>("addaccessonreg");
-
-		passcheck.DoReload(conf);
 	}
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
