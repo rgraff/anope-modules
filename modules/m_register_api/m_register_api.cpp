@@ -340,6 +340,20 @@ class AuthTokenEndpoint
     return token->GetToken();
   }
 
+  JsonObject GetTagList(NickCore* nc)
+  {
+		TagList* list = nc->Require<TagList>("taglist");
+
+		JsonObject taglist;
+		for (size_t idx = 0; idx < (*list)->size(); ++idx)
+		{
+			TagEntry* tag = (*list)->at(idx);
+			taglist[tag->name] = tag->value;
+		}
+
+		return taglist;
+	}
+  
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
 		Anope::string username = request.GetParameter("username");
@@ -373,11 +387,17 @@ class AuthTokenEndpoint
       APILogger(*this, request) << "Account created for '" << nc->display << "'";
     }
 
+    // Generate a token if requested
     if (request.HasParameter("token"))
     {
       Anope::string tokenName = request.GetParameter("token");
       responseObject["token"] = GetToken(request, nc, tokenName);
     }
+
+    // if (request.HasParameter("tags")) 
+    // {
+      responseObject["tags"] = GetTagList(nc);
+    // }
 
 		return true;
 	}
@@ -454,6 +474,8 @@ struct TagEntry : Serializable
 			TagList* entries = nc->Require<TagList>("taglist");
 			(*entries)->push_back(tag);
 		}
+
+
 
 		return tag;
 	}
