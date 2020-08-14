@@ -346,13 +346,16 @@ class AuthTokenEndpoint
 		Anope::string username = request.GetParameter("username");
 
     // Verify nick is not forbidden from reg/usage
-    ForbidData* nickforbid = forbidService->FindForbid(username, FT_NICK);
-    ForbidData* regforbid = forbidService->FindForbid(username, FT_REGISTER);
-    if (nickforbid || regforbid)
+    if (forbidService)
     {
-      errorObject["id"] = "forbidden_user";
-      errorObject["message"] = "This nickname is forbidden from registration";
-      return false;
+      ForbidData* nickforbid = forbidService->FindForbid(username, FT_NICK);
+      ForbidData* regforbid = forbidService->FindForbid(username, FT_REGISTER);
+      if (nickforbid || regforbid)
+      {
+        errorObject["id"] = "forbidden_user";
+        errorObject["message"] = "This nickname is forbidden from registration";
+        return false;
+      }
     }
 
     // Find our NickAlias from our username
@@ -735,8 +738,8 @@ class RegisterApiModule
 		if (!httpd)
 			throw ConfigException("Unable to find http reference, is m_httpd loaded?");
 
-    if (!forbidService)
-    	throw ConfigException("Unable to find forbid service, is os_forbid loaded?");
+    // if (!forbidService)
+    // 	throw ConfigException("Unable to find forbid service, is os_forbid loaded?");
 
 		RegisterPages();
 
