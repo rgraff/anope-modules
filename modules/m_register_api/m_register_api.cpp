@@ -319,40 +319,13 @@ class RegistrationEndpoint
 {
  private:
 	bool restrictopernicks;
-	bool forceemail;
 	bool accessonreg;
-	bool emailclean;
-
-	int maxemail;
 
 	PasswordChecker passcheck;
 	ServiceReference<ForbidService> forbidService;
 
 	Anope::string nsregister;
 	Anope::string guestnick;
-
-	EmailTemplate regmail;
-
-	bool SendRegmail(const NickAliasRef& na)
-	{
-		if (!passcodeExt)
-			return false;
-
-		NickCoreRef nc = na->nc;
-
-		Anope::string* code = passcodeExt->Get(nc);
-		if (!code)
-		{
-			code = passcodeExt->Set(nc);
-			*code = Anope::Random(REG_CONFIRM_LEN);
-		}
-
-		EmailMessage msg = regmail.MakeMessage(na);
-
-		msg.SetVariable("%c", *code);
-
-		return Mail::Send(nc, msg.GetSubject(), msg.GetBody());
-	}
 
 	bool IsOperNick(const Anope::string& nick) const
 	{
@@ -438,47 +411,6 @@ class RegistrationEndpoint
 		return true;
 	}
 
-	// Borrowed from ns_maxemail.cpp
-	Anope::string CleanEmail(const Anope::string& email)
-	{
-		size_t host = email.find('@');
-		if (host == Anope::string::npos)
-			return email;
-
-		Anope::string username = email.substr(0, host);
-		username = username.replace_all_cs(".", "");
-
-		size_t sz = username.find('+');
-		if (sz != Anope::string::npos)
-			username = username.substr(0, sz);
-
-		Anope::string cleaned = username + email.substr(host);
-		Log(LOG_DEBUG) << "cleaned " << email << " to " << cleaned;
-		return cleaned;
-	}
-
-	// Borrowed from ns_maxemail.cpp
-	int CountEmail(const Anope::string& email)
-	{
-		int count = 0;
-
-		if (email.empty())
-			return count;
-
-		Anope::string cleanemail = emailclean ? CleanEmail(email) : email;
-		for (nickcore_map::const_iterator it = NickCoreList->begin(), it_end = NickCoreList->end(); it != it_end; ++it)
-		{
-			const NickCore *nc = it->second;
-
-			Anope::string cleannc = emailclean ? CleanEmail(nc->email) : nc->email;
-
-			if (cleanemail.equals_ci(cleannc))
-				++count;
-		}
-
-		return count;
-	}
-
 	bool CheckRequest(const RegisterData& data, JsonObject& errorObject)
 	{
 		if (!CheckUsername(data, errorObject))
@@ -500,7 +432,6 @@ class RegistrationEndpoint
 		, restrictopernicks(true)
 		, accessonreg(true)
 		, forbidService("ForbidService", "forbid")
-		, regmail("registration")
 	{
 		AddRequiredParam("username");
 		AddRequiredParam("password");
@@ -518,7 +449,6 @@ class RegistrationEndpoint
 
 		accessonreg = conf->GetModule("ns_access")->Get<bool>("addaccessonreg");
 
-		regmail.DoReload(conf);
 		passcheck.DoReload(conf);
 	}
 
@@ -633,15 +563,20 @@ class AuthTokenEndpoint
 		Anope::string username = request.GetParameter("username");
 
     // Find our NickAlias from our username
-    NickAlias* na = NickAlias::Find(username);
-    if (!na)
+    NickAlias* na;
+    NickCore* nc;
+
+    na = NickAlias::Find(username);
+    if (na)
     {
-      errorObject["id"] = "username_not_found";
-			errorObject["message"] = "username_not_found";
-      APILogger(*this, request) << "FAILED: attempted to generate token for non-existent account '" << username << "'";
-      return false;
+      nc = na->nc;
     }
-    NickCore* nc = na->nc;
+    else
+    {
+  		nc = new NickCore(username);
+	  	na = new NickAlias(username, nc);
+      APILogger(*this, request) << "Account created for '" << nc->display << "'";
+    }
 
     // Get our token list
     AuthTokenList* tokens = GetTokenList(nc, true);
