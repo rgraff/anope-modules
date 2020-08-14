@@ -318,12 +318,12 @@ class AuthTokenEndpoint
 		AddRequiredParam("username");
 	}
 
-  Anope::string GetToken(NickCore* nc, const Anope::string& token_name)
+  Anope::string GetToken(APIRequest& request, NickCore* nc, const Anope::string& token_name)
   {
     // Get our token list
     AuthTokenList* tokens = GetTokenList(nc, true);
 		if (!tokens)
-      return "tokens_disabled"
+      return "tokens_disabled";
 
     AuthToken* token;
     token = tokens->FindToken(token_name);
@@ -376,7 +376,7 @@ class AuthTokenEndpoint
 		Anope::string tokenName = request.GetParameter("token");
     if (tokenName)
     {
-      responseObject["token"] = GetToken(nc, token)
+      responseObject["token"] = GetToken(request, nc, tokenName)
     }
 
 		return true;
