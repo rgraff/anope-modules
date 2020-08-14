@@ -780,7 +780,7 @@ class APIIndentifyRequest
 };
 
 class AuthTokenEndpoint
-  : public APIEndpoint
+  : public BasicAPIEndpoint
 {
  public:
   AuthTokenEndpoint(Module* Owner)
@@ -790,14 +790,14 @@ class AuthTokenEndpoint
     AddRequiredParam("name");
 	}
 
-  bool HandleRequest(HTTPProvider* provider, const Anope::string& string, HTTPClient* client, APIRequest& request,
-					   HTTPReply& reply) anope_override
+	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
 		Anope::string username = request.GetParameter("username");
 
     // Find our NickAlias from our username
-    NickAlias* na = NickAlias::Find(account);
-    if (!na){
+    NickAlias* na = NickAlias::Find(username);
+    if (!na)
+    {
       errorObject["id"] = "username_not_found";
 			errorObject["message"] = "username_not_found";
       APILogger(*this, request) << "FAILED: attempted to generate token for non-existent account '" << username << "'";
@@ -839,7 +839,7 @@ class AuthTokenEndpoint
 
 		return true;
 	}
-}
+};
 
 
 class LoginEndpoint
