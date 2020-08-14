@@ -6,11 +6,7 @@
 #include "third/m_token_auth.h"
 #include "api_session.h"
 
-#define GUEST_SUFFIX_LENGTH 7
 #define STRICT_PASS_LENGTH 5
-#define REG_CONFIRM_LEN 9
-#define RESET_CONFIRM_LEN 20
-
 #define DEFAULT_PASS_LEN 32
 
 ExtensibleRef<Anope::string> passcodeExt("passcode");
@@ -116,45 +112,6 @@ struct RegisterData
 		data.password = request.GetParameter("password");
 		data.force_confirm = request.GetParameter("force_confirm") == "1";
 		return data;
-	}
-};
-
-struct PasswordChecker
-{
-	bool strictpasswords;
-
-	unsigned passlen;
-
-	PasswordChecker()
-		: strictpasswords(true)
-		, passlen(DEFAULT_PASS_LEN)
-	{
-	}
-
-	bool Check(const Anope::string& username, const Anope::string& password) const
-	{
-		if (password.equals_ci(username))
-			return false;
-
-		if (password.length() > passlen)
-			return false;
-
-		if (strictpasswords && password.length() < STRICT_PASS_LENGTH)
-			return false;
-
-		if (password.find(' ') != Anope::string::npos)
-			return false;
-
-		return true;
-	}
-
-	void DoReload(Configuration::Conf* conf)
-	{
-		Configuration::Block* nickserv = conf->GetModule("nickserv");
-
-		passlen = nickserv->Get<unsigned>("passlen", stringify(DEFAULT_PASS_LEN));
-
-		strictpasswords = conf->GetBlock("options")->Get<bool>("strictpasswords");
 	}
 };
 
@@ -321,7 +278,6 @@ class RegistrationEndpoint
 	bool restrictopernicks;
 	bool accessonreg;
 
-	PasswordChecker passcheck;
 	ServiceReference<ForbidService> forbidService;
 
 	Anope::string nsregister;
@@ -339,32 +295,6 @@ class RegistrationEndpoint
 		return false;
 	}
 
-	bool IsGuest(const Anope::string& nick) const
-	{
-		Anope::string::size_type nicklen, guestlen;
-
-		nicklen = nick.length();
-		guestlen = guestnick.length();
-
-		if (nicklen > (guestlen + GUEST_SUFFIX_LENGTH))
-			// Nick is longer than the possible guest nick
-			return false;
-
-		if (nicklen <= guestlen)
-			// Nick is shorter than the shortest possible guest nick
-			return false;
-
-		if (nick.substr(0, guestlen).equals_ci(guestnick))
-			// Nick doesn't start with the guest prefix
-			return false;
-
-		if (nick.substr(guestlen).find_first_not_of("1234567890") != Anope::string::npos)
-			// Nick contains non-digits after guest prefix
-			return false;
-
-		return true;
-	}
-
 	bool CheckUsername(const RegisterData& data, JsonObject& errorObject)
 	{
 		if (User::Find(data.username) || BotInfo::Find(data.username, true) ||
@@ -379,13 +309,6 @@ class RegistrationEndpoint
 		{
 			errorObject["id"] = "user_exists";
 			errorObject["message"] = "A user with that name is already registered";
-			return false;
-		}
-
-		if (IsGuest(data.username))
-		{
-			errorObject["id"] = "no_guest";
-			errorObject["message"] = "Guest nicknames may not be registered";
 			return false;
 		}
 
@@ -997,8 +920,6 @@ class RegisterApiModule
 {
 	ServiceReference<HTTPProvider> httpd;
 	Serialize::Type session_type;
-
-	PasswordChecker passcheck;
 
 	RegistrationEndpoint reg;
 	AddTokenEndpoint addtoken;
