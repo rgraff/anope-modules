@@ -330,21 +330,6 @@ class RegistrationEndpoint
 		return true;
 	}
 
-	bool CheckRequest(const RegisterData& data, JsonObject& errorObject)
-	{
-		if (!CheckUsername(data, errorObject))
-			return false;
-
-		if (!passcheck.Check(data.username, data.password))
-		{
-			errorObject["id"] = "invalid_password";
-			errorObject["message"] = "That password is invalid";
-			return false;
-		}
-
-		return true;
-	}
-
  public:
 	RegistrationEndpoint(Module* Creator)
 		: BasicAPIEndpoint(Creator, "register")
@@ -374,7 +359,8 @@ class RegistrationEndpoint
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
 		RegisterData data = RegisterData::FromMessage(request);
-		if (!CheckRequest(data, errorObject))
+
+    if (!CheckUsername(data, errorObject))
 			return false;
 
 		NickCoreRef nc = new NickCore(data.username);
