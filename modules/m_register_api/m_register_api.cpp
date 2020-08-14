@@ -15,7 +15,6 @@
 
 ExtensibleRef<Anope::string> passcodeExt("passcode");
 ExtensibleRef<bool> unconfirmedExt("UNCONFIRMED");
-ExtensibleRef<Anope::string> regserverExt("REGSERVER");
 
 class APIRequest
 	: public HTTPMessage
@@ -101,9 +100,7 @@ class APIRequest
 struct RegisterData
 {
 	Anope::string username;
-	Anope::string email;
 	Anope::string password;
-	Anope::string source;
 	Anope::string ident;
 	Anope::string ip;
 	bool force_confirm;
@@ -116,9 +113,7 @@ struct RegisterData
 		data.username = request.GetParameter("username");
 		data.ident = request.GetParameter("ident");
 		data.ip = request.getUserIp();
-		data.email = request.GetParameter("email");
 		data.password = request.GetParameter("password");
-		data.source = request.GetParameter("source");
 		data.force_confirm = request.GetParameter("force_confirm") == "1";
 		return data;
 	}
@@ -509,7 +504,6 @@ class RegistrationEndpoint
 	{
 		AddRequiredParam("username");
 		AddRequiredParam("password");
-		AddRequiredParam("source");
 		AddRequiredParam("user_ip");
 	}
 
@@ -541,9 +535,6 @@ class RegistrationEndpoint
 		na->last_realname = data.username;
 
 		APILogger(*this, request) << "Account created: " << nc->display;
-
-		if (regserverExt)
-			regserverExt->Set(nc, data.source);
 
 		if (!data.force_confirm)
 		{
@@ -769,54 +760,6 @@ class AuthTokenEndpoint
 	}
 };
 
-
-class LoginEndpoint
-	: public APIEndpoint
-{
- public:
-	LoginEndpoint(Module* Owner)
-		: APIEndpoint(Owner, "login")
-	{
-		AddRequiredParam("username");
-		AddRequiredParam("password");
-		AddRequiredParam("user_ip");
-	}
-
-	bool HandleRequest(HTTPProvider* provider, const Anope::string& string, HTTPClient* client, APIRequest& request,
-					   HTTPReply& reply) anope_override
-	{
-		Anope::string user, password;
-
-		user = request.GetParameter("username");
-		password = request.GetParameter("password");
-
-		APIIndentifyRequest* req = new APIIndentifyRequest(creator, user, password, reply, client, request, this);
-		FOREACH_MOD(OnCheckAuthentication, (NULL, req));
-		req->Dispatch();
-		return false;
-	}
-};
-
-class LogoutEndpoint
-	: public BasicAPIEndpoint
-{
- public:
-	LogoutEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "logout")
-	{
-		RequireSession();
-	}
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		SessionRef session = request.session;
-
-		APILogger(*this, request) << "Session logout for account: " << session->Account()->display;
-
-		session->Invalidate();
-		return true;
-	}
-};
 
 class ResetPassEndpoint
 	: public BasicAPIEndpoint
@@ -1376,8 +1319,6 @@ class RegisterApiModule
 
 	RegistrationEndpoint reg;
 	ConfirmEndpoint confirm;
-	LoginEndpoint login;
-	LogoutEndpoint logout;
 	ResetPassEndpoint resetpass;
 	ResetConfirmEndpoint resetconfirm;
 	SetPasswordEndpoint setpass;
@@ -1402,8 +1343,6 @@ class RegisterApiModule
 		, session_type(SESSION_TYPE, Session::Unserialize)
 		, reg(this)
 		, confirm(this)
-		, login(this)
-		, logout(this)
 		, resetpass(this)
 		, resetconfirm(this, resetpass.resetinfo, passcheck)
 		, setpass(this, passcheck)
@@ -1422,8 +1361,6 @@ class RegisterApiModule
 
 		pages.push_back(&reg);
 		pages.push_back(&confirm);
-		pages.push_back(&login);
-		pages.push_back(&logout);
 		pages.push_back(&resetpass);
 		pages.push_back(&resetconfirm);
 		pages.push_back(&setpass);
