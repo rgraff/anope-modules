@@ -89,28 +89,6 @@ class APIRequest
 	}
 };
 
-struct RegisterData
-{
-	Anope::string username;
-	Anope::string password;
-	Anope::string ident;
-	Anope::string ip;
-	bool force_confirm;
-
-	RegisterData() : force_confirm(false) {}
-
-	static RegisterData FromMessage(APIRequest& request)
-	{
-		RegisterData data;
-		data.username = request.GetParameter("username");
-		data.ident = request.GetParameter("ident");
-		data.ip = request.getUserIp();
-		data.password = request.GetParameter("password");
-		data.force_confirm = request.GetParameter("force_confirm") == "1";
-		return data;
-	}
-};
-
 class APIEndpoint;
 
 class APILogger
@@ -737,9 +715,6 @@ class RegisterApiModule
 		this->httpd = ServiceReference<HTTPProvider>("HTTPProvider", provider);
 		if (!httpd)
 			throw ConfigException("Unable to find http reference, is m_httpd loaded?");
-
-    // if (!forbidService)
-    // 	throw ConfigException("Unable to find forbid service, is os_forbid loaded?");
 
 		RegisterPages();
 
