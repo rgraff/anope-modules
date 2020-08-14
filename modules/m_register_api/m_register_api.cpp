@@ -484,64 +484,9 @@ class RegistrationEndpoint
 		return count;
 	}
 
-	// Borrowed from ns_maxemail.cpp
-	bool CheckEmailLimitReached(const Anope::string& email)
-	{
-		if (maxemail < 1 || email.empty())
-			return false;
-
-		return CountEmail(email) >= maxemail;
-	}
-
-	bool CheckEmail(const RegisterData& data, JsonObject& errorObject)
-	{
-		if (data.email.empty())
-		{
-			if (forceemail)
-			{
-				errorObject["id"] = "missing_email";
-				errorObject["message"] = "An email address is required for registration";
-				return false;
-			}
-
-			// If forceemail = false, an empty email is valid
-			return true;
-		}
-
-		if (!Mail::Validate(data.email))
-		{
-			errorObject["id"] = "invalid_email";
-			errorObject["message"] = "A valid email address is required for registration";
-			return false;
-		}
-
-		if (forbidService)
-		{
-			ForbidData* f = this->forbidService->FindForbid(data.email, FT_EMAIL);
-			if (f)
-			{
-				errorObject["id"] = "forbidden_email";
-				errorObject["message"] = "This email address is forbidden";
-				return false;
-			}
-		}
-
-		if (this->CheckEmailLimitReached(data.email))
-		{
-			errorObject["id"] = "max_email";
-			errorObject["message"] = "This email address has reached its account limit";
-			return false;
-		}
-
-		return true;
-	}
-
 	bool CheckRequest(const RegisterData& data, JsonObject& errorObject)
 	{
 		if (!CheckUsername(data, errorObject))
-			return false;
-
-		if (!CheckEmail(data, errorObject))
 			return false;
 
 		if (!passcheck.Check(data.username, data.password))
@@ -558,10 +503,7 @@ class RegistrationEndpoint
 	RegistrationEndpoint(Module* Creator)
 		: BasicAPIEndpoint(Creator, "register")
 		, restrictopernicks(true)
-		, forceemail(true)
 		, accessonreg(true)
-		, emailclean(true)
-		, maxemail(0)
 		, forbidService("ForbidService", "forbid")
 		, regmail("registration")
 	{
@@ -569,9 +511,6 @@ class RegistrationEndpoint
 		AddRequiredParam("password");
 		AddRequiredParam("source");
 		AddRequiredParam("user_ip");
-
-		if (forceemail)
-			AddRequiredParam("email");
 	}
 
 	void DoReload(Configuration::Conf* conf) anope_override
@@ -579,16 +518,11 @@ class RegistrationEndpoint
 		Configuration::Block* nickserv = conf->GetModule("nickserv");
 
 		restrictopernicks = nickserv->Get<bool>("restrictopernicks");
-		forceemail = nickserv->Get<bool>("forceemail", "yes");
 		guestnick = nickserv->Get<const Anope::string>("guestnickprefix", "Guest");
 
 		nsregister = conf->GetModule("ns_register")->Get<const Anope::string>("registration");
 
 		accessonreg = conf->GetModule("ns_access")->Get<bool>("addaccessonreg");
-
-		Configuration::Block* maxemailBlock = conf->GetModule("ns_maxemail");
-		maxemail = maxemailBlock->Get<int>("maxemails");
-		emailclean = maxemailBlock->Get<bool>("remove_aliases", "true");
 
 		regmail.DoReload(conf);
 		passcheck.DoReload(conf);
@@ -604,15 +538,9 @@ class RegistrationEndpoint
 		NickAliasRef na = new NickAlias(data.username, nc);
 		Anope::Encrypt(data.password, nc->pass);
 
-		if (!data.email.empty())
-			nc->email = data.email;
-
 		na->last_realname = data.username;
 
-		Anope::string emailStr = (!na->nc->email.empty() ? na->nc->email : "none");
-
-		APILogger(*this, request) << "Account created: " << nc->display
-								  << " (email: " << emailStr << ")";
+		APILogger(*this, request) << "Account created: " << nc->display;
 
 		if (regserverExt)
 			regserverExt->Set(nc, data.source);
@@ -755,7 +683,6 @@ class APIIndentifyRequest
 		JsonObject obj;
 		obj["session"] = session->id;
 		obj["account"] = na->nc->display;
-		obj["email"] = na->nc->email;
 		obj["status"] = "ok";
 		obj["verified"] = !unconfirmedExt || !unconfirmedExt->HasExt(na->nc);
 
