@@ -783,8 +783,8 @@ class AuthTokenEndpoint
   : public BasicAPIEndpoint
 {
  public:
-  AuthTokenEndpoint(Module* Owner)
-		: APIEndpoint(Owner, "authtoken")
+  AuthTokenEndpoint(Module* Creator)
+		: BasicAPIEndpoint(Creator, "authtoken")
 	{
 		AddRequiredParam("username");
     AddRequiredParam("name");
