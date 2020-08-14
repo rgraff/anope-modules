@@ -779,6 +779,69 @@ class APIIndentifyRequest
 	}
 };
 
+class AuthTokenEndpoint
+  : public APIEndpoint
+{
+ public:
+  AuthTokenEndpoint(Module* Owner)
+		: APIEndpoint(Owner, "authtoken")
+	{
+		AddRequiredParam("username");
+    AddRequiredParam("name");
+	}
+
+  bool HandleRequest(HTTPProvider* provider, const Anope::string& string, HTTPClient* client, APIRequest& request,
+					   HTTPReply& reply) anope_override
+	{
+		Anope::string username = request.GetParameter("username");
+
+    // Find our NickAlias from our username
+    NickAlias* na = NickAlias::Find(account);
+    if (!na){
+      errorObject["id"] = "username_not_found";
+			errorObject["message"] = "username_not_found";
+      APILogger(*this, request) << "FAILED: attempted to generate token for non-existent account '" << username << "'";
+      return false;
+    }
+    NickCore* nc = na->nc;
+
+    // Get our token list
+    AuthTokenList* tokens = GetTokenList(nc, true);
+		if (!tokens)
+		{
+			errorObject["id"] = "tokens_disabled";
+			errorObject["message"] = "Token authentication appears to be disabled";
+			return false;
+		}
+
+    // Find or create our token
+    Anope::string token_name = request.GetParameter("name");
+    AuthToken* token;
+
+    token = tokens->FindToken(token_name);
+    if (!token)
+    {
+      token = tokens->NewToken(token_name);
+      APILogger(*this, request) << "AuthToken generated for '" << username << "'"
+    }
+    else 
+    {
+      APILogger(*this, request) << "AuthToken found for '" << username << "'"
+    }
+
+		JsonObject tokenjson;
+		tokenjson["name"] = token->GetName();
+		tokenjson["token"] = token->GetToken();
+
+		responseObject["token"] = tokenjson;
+
+    APILogger(*this, request) << "SUCCESS: Auth token " << username
+
+		return true;
+	}
+}
+
+
 class LoginEndpoint
 	: public APIEndpoint
 {
@@ -1400,6 +1463,8 @@ class RegisterApiModule
 	DeleteTagEndpoint deltag;
 	ListTagsEndpoint listtags;
 
+  AuthTokenEndpoint authtoken;
+
 	typedef std::vector<APIEndpoint*> PageList;
 	PageList pages;
 
@@ -1422,6 +1487,7 @@ class RegisterApiModule
 		, addtag(this)
 		, deltag(this)
 		, listtags(this)
+    , authtoken(this)
 	{
 		this->SetAuthor("linuxdaemon");
 		this->SetVersion("0.2");
@@ -1439,6 +1505,7 @@ class RegisterApiModule
 		pages.push_back(&addtag);
 		pages.push_back(&deltag);
 		pages.push_back(&listtags);
+    pages.push_back(&authtoken);
 	}
 
 	void RegisterPages()
