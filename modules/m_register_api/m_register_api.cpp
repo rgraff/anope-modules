@@ -316,8 +316,29 @@ class AuthTokenEndpoint
 		, forbidService("ForbidService", "forbid")
 	{
 		AddRequiredParam("username");
-    AddRequiredParam("name");
 	}
+
+  Anope::string GetToken(NickCore* nc, const Anope::string& token_name)
+  {
+    // Get our token list
+    AuthTokenList* tokens = GetTokenList(nc, true);
+		if (!tokens)
+      return "tokens_disabled"
+
+    AuthToken* token;
+    token = tokens->FindToken(token_name);
+    if (!token)
+    {
+      token = tokens->NewToken(token_name);
+      APILogger(*this, request) << "AuthToken generated for '" << username << "'";
+    }
+    else 
+    {
+      APILogger(*this, request) << "AuthToken found for '" << username << "'";
+    }
+
+    return token->GetToken();
+  }
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
@@ -352,38 +373,11 @@ class AuthTokenEndpoint
       APILogger(*this, request) << "Account created for '" << nc->display << "'";
     }
 
-    // Get our token list
-    AuthTokenList* tokens = GetTokenList(nc, true);
-		if (!tokens)
-		{
-			errorObject["id"] = "tokens_disabled";
-			errorObject["message"] = "Token authentication appears to be disabled";
-			return false;
-		}
-
-    // Find or create our token
-    Anope::string token_name = request.GetParameter("name");
-    AuthToken* token;
-
-    token = tokens->FindToken(token_name);
-    if (!token)
+		Anope::string tokenName = request.GetParameter("token");
+    if (tokenName)
     {
-      token = tokens->NewToken(token_name);
-      APILogger(*this, request) << "AuthToken generated for '" << username << "'";
+      responseObject["token"] = GetToken(nc, token)
     }
-    else 
-    {
-      APILogger(*this, request) << "AuthToken found for '" << username << "'";
-    }
-
-    // Return token
-		JsonObject tokenjson;
-		tokenjson["name"] = token->GetName();
-		tokenjson["token"] = token->GetToken();
-
-		responseObject["token"] = tokenjson;
-
-    APILogger(*this, request) << "SUCCESS: Auth token " << username;
 
 		return true;
 	}
