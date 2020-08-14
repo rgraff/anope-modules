@@ -267,88 +267,6 @@ class BasicAPIEndpoint
 	virtual bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) = 0;
 };
 
-class RegistrationEndpoint
-	: public BasicAPIEndpoint
-{
- private:
-	bool restrictopernicks;
-	bool accessonreg;
-
-	ServiceReference<ForbidService> forbidService;
-
-	Anope::string nsregister;
-	Anope::string guestnick;
-
- public:
-	RegistrationEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "register")
-		, restrictopernicks(true)
-		, accessonreg(true)
-		, forbidService("ForbidService", "forbid")
-	{
-		AddRequiredParam("username");
-		AddRequiredParam("password");
-		AddRequiredParam("user_ip");
-	}
-
-	void DoReload(Configuration::Conf* conf) anope_override
-	{
-		Configuration::Block* nickserv = conf->GetModule("nickserv");
-
-		restrictopernicks = nickserv->Get<bool>("restrictopernicks");
-		guestnick = nickserv->Get<const Anope::string>("guestnickprefix", "Guest");
-
-		nsregister = conf->GetModule("ns_register")->Get<const Anope::string>("registration");
-
-		accessonreg = conf->GetModule("ns_access")->Get<bool>("addaccessonreg");
-	}
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		RegisterData data = RegisterData::FromMessage(request);
-
-		if (forbidService)
-		{
-			ForbidData* nickforbid = forbidService->FindForbid(data.username, FT_NICK);
-			ForbidData* regforbid = forbidService->FindForbid(data.username, FT_REGISTER);
-			if (nickforbid || regforbid)
-			{
-				errorObject["id"] = "forbidden_user";
-				errorObject["message"] = "This nickname is forbidden from registration";
-				return false;
-			}
-		}
-
-		NickCoreRef nc = new NickCore(data.username);
-		NickAliasRef na = new NickAlias(data.username, nc);
-		Anope::Encrypt(data.password, nc->pass);
-
-		na->last_realname = data.username;
-
-		APILogger(*this, request) << "Account created: " << nc->display;
-
-		FOREACH_MOD(OnNickRegister, (NULL, na, data.password));
-
-		if (!data.ip.empty() && !data.ident.empty() && accessonreg)
-			nc->AddAccess(data.ident + "@" + data.ip);
-
-		request.session = new Session(nc);
-
-		if (unconfirmedExt && unconfirmedExt->HasExt(nc))
-		{
-			responseObject["verify"] = nsregister;
-			responseObject["need_verify"] = true;
-		}
-		else
-		{
-			responseObject["verify"] = "none";
-			responseObject["need_verify"] = false;
-		}
-
-		return true;
-	}
-};
-
 class APIIndentifyRequest
 	: public IdentifyRequest
 {
@@ -411,9 +329,13 @@ class APIIndentifyRequest
 class AuthTokenEndpoint
   : public BasicAPIEndpoint
 {
+ private:
+	ServiceReference<ForbidService> forbidService;
+
  public:
   AuthTokenEndpoint(Module* Creator)
 		: BasicAPIEndpoint(Creator, "authtoken")
+		, forbidService("ForbidService", "forbid")
 	{
 		AddRequiredParam("username");
     AddRequiredParam("name");
@@ -422,6 +344,16 @@ class AuthTokenEndpoint
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
 		Anope::string username = request.GetParameter("username");
+
+    // Verify nick is not forbidden from reg/usage
+    ForbidData* nickforbid = forbidService->FindForbid(data.username, FT_NICK);
+    ForbidData* regforbid = forbidService->FindForbid(data.username, FT_REGISTER);
+    if (nickforbid || regforbid)
+    {
+      errorObject["id"] = "forbidden_user";
+      errorObject["message"] = "This nickname is forbidden from registration";
+      return false;
+    }
 
     // Find our NickAlias from our username
     NickAlias* na;
@@ -728,6 +660,8 @@ class RegisterApiModule
 	: public Module
 {
 	ServiceReference<HTTPProvider> httpd;
+  ServiceReference<ForbidService> forbidService;
+
 	Serialize::Type session_type;
 
 	RegistrationEndpoint reg;
@@ -804,6 +738,9 @@ class RegisterApiModule
 		this->httpd = ServiceReference<HTTPProvider>("HTTPProvider", provider);
 		if (!httpd)
 			throw ConfigException("Unable to find http reference, is m_httpd loaded?");
+
+    if (!forbidService)
+    	throw ConfigException("Unable to find forbid service, is os_forbid loaded?");
 
 		RegisterPages();
 
