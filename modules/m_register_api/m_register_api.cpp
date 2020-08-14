@@ -373,10 +373,11 @@ class AuthTokenEndpoint
       APILogger(*this, request) << "Account created for '" << nc->display << "'";
     }
 
-		Anope::string tokenName = request.GetParameter("token");
-    if (tokenName)
+		
+    if (request.HasParameter("token"))
     {
-      responseObject["token"] = GetToken(request, nc, tokenName)
+      Anope::string tokenName = request.GetParameter("token")
+      responseObject["token"] = GetToken(request, nc, tokenName);
     }
 
 		return true;
