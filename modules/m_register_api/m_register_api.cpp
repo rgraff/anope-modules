@@ -346,8 +346,8 @@ class AuthTokenEndpoint
 		Anope::string username = request.GetParameter("username");
 
     // Verify nick is not forbidden from reg/usage
-    ForbidData* nickforbid = forbidService->FindForbid(data.username, FT_NICK);
-    ForbidData* regforbid = forbidService->FindForbid(data.username, FT_REGISTER);
+    ForbidData* nickforbid = forbidService->FindForbid(username, FT_NICK);
+    ForbidData* regforbid = forbidService->FindForbid(username, FT_REGISTER);
     if (nickforbid || regforbid)
     {
       errorObject["id"] = "forbidden_user";
@@ -664,8 +664,6 @@ class RegisterApiModule
 
 	Serialize::Type session_type;
 
-	RegistrationEndpoint reg;
-
 	ExtensibleItem<TagList> taglist;
 	Serialize::Type tagentry_type;
 	AddTagEndpoint addtag;
@@ -681,7 +679,6 @@ class RegisterApiModule
 	RegisterApiModule(const Anope::string& modname, const Anope::string& creator)
 		: Module(modname, creator, THIRD)
 		, session_type(SESSION_TYPE, Session::Unserialize)
-		, reg(this)
 		, taglist(this, "taglist")
 		, tagentry_type("TagEntry", TagEntry::Unserialize)
 		, addtag(this)
@@ -692,7 +689,6 @@ class RegisterApiModule
 		this->SetAuthor("linuxdaemon");
 		this->SetVersion("0.2");
 
-		pages.push_back(&reg);
 		pages.push_back(&addtag);
 		pages.push_back(&deltag);
 		pages.push_back(&listtags);
