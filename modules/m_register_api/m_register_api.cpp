@@ -2,12 +2,8 @@
 #include "modules/os_forbid.h"
 #include "modules/httpd.h"
 #include "third/json_api.h"
-#include "third/mail_template.h"
 #include "third/m_token_auth.h"
 #include "api_session.h"
-
-#define STRICT_PASS_LENGTH 5
-#define DEFAULT_PASS_LEN 32
 
 ExtensibleRef<Anope::string> passcodeExt("passcode");
 ExtensibleRef<bool> unconfirmedExt("UNCONFIRMED");
@@ -538,135 +534,6 @@ class AuthTokenEndpoint
 	}
 };
 
-class TokenEndpoint
-	: public BasicAPIEndpoint
-{
- public:
-	TokenEndpoint(Module* Creator, const Anope::string& name)
-		: BasicAPIEndpoint(Creator, "user/token/" + name)
-	{
-		RequireSession();
-	}
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		SessionRef session = request.session;
-		NickCore* nc = session->Account();
-
-		AuthTokenList* tokens = GetTokenList(nc, true);
-		if (!tokens)
-		{
-			errorObject["id"] = "tokens_disabled";
-			errorObject["message"] = "Token authentication appears to be disabled";
-			return false;
-		}
-
-		return HandleTokenRequest(request, responseObject, errorObject, tokens);
-	}
-
-	virtual bool HandleTokenRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject, AuthTokenList* tokens) = 0;
-};
-
-class AddTokenEndpoint
-	: public TokenEndpoint
-{
- public:
-	AddTokenEndpoint(Module* Creator)
-		: TokenEndpoint(Creator, "add")
-	{
-		AddRequiredParam("name");
-	}
-
-	bool HandleTokenRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject, AuthTokenList* tokens) anope_override
-	{
-		Anope::string name = request.GetParameter("name");
-		AuthToken* token = tokens->NewToken(name);
-
-		if (!token)
-		{
-			errorObject["id"] = "token_add_failed";
-			errorObject["message"] = "Unable to add token";
-			APILogger(*this, request) << "Attempt to add duplicate tokens to account: " << request.session->nc->display;
-			return false;
-		}
-
-		JsonObject tokenjson;
-		tokenjson["name"] = token->GetName();
-		tokenjson["token"] = token->GetToken();
-
-		responseObject["token"] = tokenjson;
-
-		return true;
-	}
-};
-
-class DeleteTokenEndpoint
-	: public TokenEndpoint
-{
- public:
-	DeleteTokenEndpoint(Module* Creator)
-		: TokenEndpoint(Creator, "delete")
-	{
-		AddRequiredParam("id");
-	}
-
-	bool HandleTokenRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject, AuthTokenList* tokens) anope_override
-	{
-		Anope::string id = request.GetParameter("id");
-		AuthToken* token = tokens->FindToken(id);
-		if (!token)
-		{
-			try
-			{
-				token = tokens->GetToken(convertTo<int>(id) - 1);
-			}
-			catch (ConvertException& e)
-			{
-				// If the id isn't a number, just fall through to the normal error response
-			}
-		}
-
-		if (!token)
-		{
-			errorObject["id"] = "no_token";
-			errorObject["message"] = "No matching token found.";
-			return false;
-		}
-
-		delete token;
-		return true;
-	}
-};
-
-class ListTokensEndpoint
-	: public TokenEndpoint
-{
- public:
-	ListTokensEndpoint(Module* Creator)
-		: TokenEndpoint(Creator, "list")
-	{
-	}
-
-	bool HandleTokenRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject, AuthTokenList* tokens) anope_override
-	{
-		JsonArray tokenlist;
-		AuthToken* t;
-		for (long i = 0; (t = tokens->GetToken(i)); ++i)
-		{
-			JsonObject tokenObj;
-
-			tokenObj["name"] = t->GetName();
-			tokenObj["token"] = t->GetToken();
-			tokenObj["id"] = i + 1;
-
-			tokenlist.push_back(tokenObj);
-		}
-
-		responseObject["tokens"] = tokenlist;
-		return true;
-	}
-};
-
 struct TagEntry;
 
 struct TagList : Serialize::Checker<std::vector<TagEntry*> >
@@ -922,9 +789,6 @@ class RegisterApiModule
 	Serialize::Type session_type;
 
 	RegistrationEndpoint reg;
-	AddTokenEndpoint addtoken;
-	DeleteTokenEndpoint deltoken;
-	ListTokensEndpoint listtoken;
 
 	ExtensibleItem<TagList> taglist;
 	Serialize::Type tagentry_type;
@@ -942,9 +806,6 @@ class RegisterApiModule
 		: Module(modname, creator, THIRD)
 		, session_type(SESSION_TYPE, Session::Unserialize)
 		, reg(this)
-		, addtoken(this)
-		, deltoken(this)
-		, listtoken(this)
 		, taglist(this, "taglist")
 		, tagentry_type("TagEntry", TagEntry::Unserialize)
 		, addtag(this)
@@ -956,9 +817,6 @@ class RegisterApiModule
 		this->SetVersion("0.2");
 
 		pages.push_back(&reg);
-		pages.push_back(&addtoken);
-		pages.push_back(&deltoken);
-		pages.push_back(&listtoken);
 		pages.push_back(&addtag);
 		pages.push_back(&deltag);
 		pages.push_back(&listtags);
@@ -1004,9 +862,6 @@ class RegisterApiModule
 		this->httpd = ServiceReference<HTTPProvider>("HTTPProvider", provider);
 		if (!httpd)
 			throw ConfigException("Unable to find http reference, is m_httpd loaded?");
-
-		if (!httpd->IsSSL())
-			throw ConfigException("Registration API http must support SSL");
 
 		RegisterPages();
 
