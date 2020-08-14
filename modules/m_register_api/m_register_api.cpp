@@ -3,7 +3,6 @@
 #include "modules/httpd.h"
 #include "third/json_api.h"
 #include "third/m_token_auth.h"
-#include "api_session.h"
 
 ExtensibleRef<Anope::string> passcodeExt("passcode");
 ExtensibleRef<bool> unconfirmedExt("UNCONFIRMED");
@@ -21,14 +20,12 @@ class APIRequest
 	const ip_t user_ip;
 
  public:
-	SessionRef session;
 
 	APIRequest(const APIRequest& other)
 		: HTTPMessage(other)
 		, client_id(other.client_id)
 		, client_ip(other.client_ip)
 		, user_ip(other.user_ip)
-		, session(other.session)
 	{
 	}
 
@@ -38,10 +35,6 @@ class APIRequest
 		, client_ip(ClientIP)
 		, user_ip(GetParameter("user_ip"))
 	{
-		Anope::string session_id;
-
-		if (GetParameter("session", session_id))
-			session = Session::Find(session_id, true, true);
 	}
 
 	const Anope::string& getClientId() const
@@ -115,12 +108,6 @@ class APIEndpoint
 	{
 	}
 
-	void RequireSession()
-	{
-		AddRequiredParam("session");
-		need_login = true;
-	}
-
 	void AddRequiredParam(const Anope::string& name)
 	{
 		required_params.insert(name);
@@ -135,24 +122,6 @@ class APIEndpoint
 				   HTTPMessage& message, HTTPReply& reply) anope_override
 	{
 		APIRequest request(message, client->GetIP());
-
-		bool logged_in = request.session && request.session->LoggedIn();
-
-		if (need_login && !logged_in)
-		{
-			reply.error = HTTP_BAD_REQUEST;
-
-			JsonObject error;
-			error["id"] = "no_login";
-			error["message"] = "Login required";
-
-			JsonObject responseObj;
-			responseObj["status"] = "error";
-			responseObj["error"] = error;
-
-			reply.Write(responseObj.str());
-			return true;
-		}
 
 		if (!request.IsValid())
 		{
@@ -234,8 +203,6 @@ class BasicAPIEndpoint
 		else
 		{
 			responseObject["status"] = "ok";
-			if (request.session && request.session->Check())
-				responseObject["session"] = request.session->id;
 		}
 		reply.Write(responseObject.str());
 
@@ -243,65 +210,6 @@ class BasicAPIEndpoint
 	}
 
 	virtual bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) = 0;
-};
-
-class APIIndentifyRequest
-	: public IdentifyRequest
-{
- private:
-	HTTPReply reply;
-	Reference<HTTPClient> client;
-	APIRequest request;
-	APIEndpoint* endpoint;
-
- public:
-	APIIndentifyRequest(Module* o, const Anope::string& acc, const Anope::string& pass, HTTPReply& Reply,
-						const Reference<HTTPClient>& Client, const APIRequest& Request, APIEndpoint* Endpoint)
-		: IdentifyRequest(o, acc, pass)
-		, reply(Reply)
-		, client(Client)
-		, request(Request)
-		, endpoint(Endpoint)
-	{
-	}
-
-	void OnResult(const JsonObject& obj)
-	{
-		reply.Write(obj.str());
-		client->SendReply(&reply);
-	}
-
-	void OnSuccess() anope_override
-	{
-		NickAliasRef na = NickAlias::Find(GetAccount());
-		if (!na)
-			return OnFail();
-
-		SessionRef session = new Session(na->nc);
-		JsonObject obj;
-		obj["session"] = session->id;
-		obj["account"] = na->nc->display;
-		obj["status"] = "ok";
-		obj["verified"] = !unconfirmedExt || !unconfirmedExt->HasExt(na->nc);
-
-		APILogger(*endpoint, request) << "Account login: " << na->nc->display;
-
-		OnResult(obj);
-	}
-
-	void OnFail() anope_override
-	{
-		JsonObject obj, error;
-		error["id"] = "failed_login";
-		error["message"] = "Invalid login credentials";
-
-		obj["error"] = error;
-		obj["status"] = "error";
-
-		APILogger(*endpoint, request) << "Failed account login: " << GetAccount();
-
-		OnResult(obj);
-	}
 };
 
 class AuthTokenEndpoint
@@ -340,20 +248,6 @@ class AuthTokenEndpoint
     return token->GetToken();
   }
 
-  JsonObject GetTagList(NickCore* nc)
-  {
-		TagList* list = nc->Require<TagList>("taglist");
-
-		JsonObject taglist;
-		for (size_t idx = 0; idx < (*list)->size(); ++idx)
-		{
-			TagEntry* tag = (*list)->at(idx);
-			taglist[tag->name] = tag->value;
-		}
-
-		return taglist;
-	}
-  
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
 		Anope::string username = request.GetParameter("username");
@@ -393,11 +287,6 @@ class AuthTokenEndpoint
       Anope::string tokenName = request.GetParameter("token");
       responseObject["token"] = GetToken(request, nc, tokenName);
     }
-
-    // if (request.HasParameter("tags")) 
-    // {
-      responseObject["tags"] = GetTagList(nc);
-    // }
 
 		return true;
 	}
@@ -550,13 +439,28 @@ class AddTagEndpoint
 	AddTagEndpoint(Module* Creator)
 		: BasicAPIEndpoint(Creator, "user/tags/add")
 	{
-		RequireSession();
+		AddRequiredParam("username");
 		AddRequiredParam("name");
 		AddRequiredParam("value");
 	}
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
+    NickAlias* na;
+    NickCore* nc;
+
+    na = NickAlias::Find(username);
+    if (na)
+    {
+      nc = na->nc;
+    }
+    else
+    {
+				errorObject["id"] = "invalid_username";
+				errorObject["message"] = "Username does not exist";	
+				return false;
+    }
+
 		Anope::string tagname = request.GetParameter("name");
 		for (Anope::string::const_iterator iter = tagname.begin(); iter != tagname.end(); ++iter)
 		{
@@ -570,7 +474,6 @@ class AddTagEndpoint
 			}
 		}
 
-		NickCore* nc = request.session->Account();
 		TagList* list = nc->Require<TagList>("taglist");
 
 		Anope::string tagvalue = request.GetParameter("value");	
@@ -603,13 +506,27 @@ class DeleteTagEndpoint
 	DeleteTagEndpoint(Module* Creator)
 		: BasicAPIEndpoint(Creator, "user/tags/delete")
 	{
-		RequireSession();
+		AddRequiredParam("username");
 		AddRequiredParam("name");
 	}
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
-		NickCore* nc = request.session->Account();
+		NickAlias* na;
+    NickCore* nc;
+
+    na = NickAlias::Find(username);
+    if (na)
+    {
+      nc = na->nc;
+    }
+    else
+    {
+				errorObject["id"] = "invalid_username";
+				errorObject["message"] = "Username does not exist";	
+				return false;
+    }
+
 		TagList* list = nc->Require<TagList>("taglist");
 
 		size_t listidx = list->Find(request.GetParameter("name"));
@@ -634,12 +551,26 @@ class ListTagsEndpoint
 	ListTagsEndpoint(Module* Creator)
 		: BasicAPIEndpoint(Creator, "user/tags/list")
 	{
-		RequireSession();
-	}
+    AddRequiredParam("username");
+  }
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
-		NickCore* nc = request.session->Account();
+		NickAlias* na;
+    NickCore* nc;
+
+    na = NickAlias::Find(username);
+    if (na)
+    {
+      nc = na->nc;
+    }
+    else
+    {
+				errorObject["id"] = "invalid_username";
+				errorObject["message"] = "Username does not exist";	
+				return false;
+    }
+  
 		TagList* list = nc->Require<TagList>("taglist");
 
 		JsonObject taglist;
@@ -659,8 +590,6 @@ class RegisterApiModule
 	ServiceReference<HTTPProvider> httpd;
   ServiceReference<ForbidService> forbidService;
 
-	Serialize::Type session_type;
-
 	ExtensibleItem<TagList> taglist;
 	Serialize::Type tagentry_type;
 	AddTagEndpoint addtag;
@@ -675,7 +604,6 @@ class RegisterApiModule
  public:
 	RegisterApiModule(const Anope::string& modname, const Anope::string& creator)
 		: Module(modname, creator, THIRD)
-		, session_type(SESSION_TYPE, Session::Unserialize)
 		, taglist(this, "taglist")
 		, tagentry_type("TagEntry", TagEntry::Unserialize)
 		, addtag(this)
@@ -683,8 +611,8 @@ class RegisterApiModule
 		, listtags(this)
     , authtoken(this)
 	{
-		this->SetAuthor("linuxdaemon");
-		this->SetVersion("0.2");
+		this->SetAuthor("rgraff"); // derivitive of the work of linuxdaemon & others
+		this->SetVersion("0.1");
 
 		pages.push_back(&addtag);
 		pages.push_back(&deltag);
