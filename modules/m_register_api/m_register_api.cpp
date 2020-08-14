@@ -279,57 +279,6 @@ class RegistrationEndpoint
 	Anope::string nsregister;
 	Anope::string guestnick;
 
-	bool IsOperNick(const Anope::string& nick) const
-	{
-		for (std::vector<Oper*>::const_iterator i = Oper::opers.begin(); i != Oper::opers.end(); ++i)
-		{
-			if (nick.find_ci((*i)->name) != Anope::string::npos)
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-
-	bool CheckUsername(const RegisterData& data, JsonObject& errorObject)
-	{
-		if (User::Find(data.username) || BotInfo::Find(data.username, true) ||
-			(restrictopernicks && IsOperNick(data.username)))
-		{
-			errorObject["id"] = "name_in_use";
-			errorObject["message"] = "This username is in use by another user and can not be registered";
-			return false;
-		}
-
-		if (NickCore::Find(data.username))
-		{
-			errorObject["id"] = "user_exists";
-			errorObject["message"] = "A user with that name is already registered";
-			return false;
-		}
-
-		if (!IRCD->IsNickValid(data.username))
-		{
-			errorObject["id"] = "invalid_name";
-			errorObject["message"] = "Username is invalid";
-			return false;
-		}
-
-		if (forbidService)
-		{
-			ForbidData* nickforbid = forbidService->FindForbid(data.username, FT_NICK);
-			ForbidData* regforbid = forbidService->FindForbid(data.username, FT_REGISTER);
-			if (nickforbid || regforbid)
-			{
-				errorObject["id"] = "forbidden_user";
-				errorObject["message"] = "This nickname is forbidden from registration";
-				return false;
-			}
-		}
-
-		return true;
-	}
-
  public:
 	RegistrationEndpoint(Module* Creator)
 		: BasicAPIEndpoint(Creator, "register")
@@ -360,8 +309,17 @@ class RegistrationEndpoint
 	{
 		RegisterData data = RegisterData::FromMessage(request);
 
-    if (!CheckUsername(data, errorObject))
-			return false;
+		if (forbidService)
+		{
+			ForbidData* nickforbid = forbidService->FindForbid(data.username, FT_NICK);
+			ForbidData* regforbid = forbidService->FindForbid(data.username, FT_REGISTER);
+			if (nickforbid || regforbid)
+			{
+				errorObject["id"] = "forbidden_user";
+				errorObject["message"] = "This nickname is forbidden from registration";
+				return false;
+			}
+		}
 
 		NickCoreRef nc = new NickCore(data.username);
 		NickAliasRef na = new NickAlias(data.username, nc);
