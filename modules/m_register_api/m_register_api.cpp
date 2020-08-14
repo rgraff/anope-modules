@@ -446,6 +446,8 @@ class AddTagEndpoint
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
+    Anope::string username = request.GetParameter("username");
+
     NickAlias* na;
     NickCore* nc;
 
@@ -512,6 +514,8 @@ class DeleteTagEndpoint
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
+    Anope::string username = request.GetParameter("username");
+
 		NickAlias* na;
     NickCore* nc;
 
@@ -556,6 +560,8 @@ class ListTagsEndpoint
 
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
+    Anope::string username = request.GetParameter("username");
+
 		NickAlias* na;
     NickCore* nc;
 
