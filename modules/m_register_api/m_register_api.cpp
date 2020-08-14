@@ -536,15 +536,6 @@ class RegistrationEndpoint
 
 		APILogger(*this, request) << "Account created: " << nc->display;
 
-		if (!data.force_confirm)
-		{
-			DoConfirm(na, data);
-		}
-		else
-		{
-			APILogger(*this, request) << "Account " << nc->display << " confirmed via OAuth";
-		}
-
 		FOREACH_MOD(OnNickRegister, (NULL, na, data.password));
 
 		if (!data.ip.empty() && !data.ident.empty() && accessonreg)
@@ -564,26 +555,6 @@ class RegistrationEndpoint
 		}
 
 		return true;
-	}
-
- private:
-	void DoConfirm(NickAlias* na, const RegisterData& data)
-	{
-		if (!unconfirmedExt || !passcodeExt)
-			return;
-
-		if (nsregister.equals_ci("admin"))
-		{
-			unconfirmedExt->Set(na->nc);
-		}
-		else if (nsregister.equals_ci("mail"))
-		{
-			if (!data.email.empty())
-			{
-				unconfirmedExt->Set(na->nc);
-				SendRegmail(na);
-			}
-		}
 	}
 };
 
