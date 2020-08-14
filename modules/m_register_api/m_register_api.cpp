@@ -330,11 +330,11 @@ class AuthTokenEndpoint
     if (!token)
     {
       token = tokens->NewToken(token_name);
-      APILogger(*this, request) << "AuthToken generated for '" << username << "'";
+      APILogger(*this, request) << "AuthToken generated for '" << nc->display << "'";
     }
     else 
     {
-      APILogger(*this, request) << "AuthToken found for '" << username << "'";
+      APILogger(*this, request) << "AuthToken found for '" << nc->display << "'";
     }
 
     return token->GetToken();
