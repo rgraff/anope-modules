@@ -822,20 +822,21 @@ class AuthTokenEndpoint
     if (!token)
     {
       token = tokens->NewToken(token_name);
-      APILogger(*this, request) << "AuthToken generated for '" << username << "'"
+      APILogger(*this, request) << "AuthToken generated for '" << username << "'";
     }
     else 
     {
-      APILogger(*this, request) << "AuthToken found for '" << username << "'"
+      APILogger(*this, request) << "AuthToken found for '" << username << "'";
     }
 
+    // Return token
 		JsonObject tokenjson;
 		tokenjson["name"] = token->GetName();
 		tokenjson["token"] = token->GetToken();
 
 		responseObject["token"] = tokenjson;
 
-    APILogger(*this, request) << "SUCCESS: Auth token " << username
+    APILogger(*this, request) << "SUCCESS: Auth token " << username;
 
 		return true;
 	}
