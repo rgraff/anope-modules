@@ -558,57 +558,6 @@ class RegistrationEndpoint
 	}
 };
 
-class ConfirmEndpoint
-	: public BasicAPIEndpoint
-{
- public:
-	ConfirmEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "confirm")
-	{
-		RequireSession();
-		AddRequiredParam("code");
-		AddRequiredParam("user_ip");
-	}
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		Anope::string code;
-
-		if (!unconfirmedExt || !passcodeExt)
-		{
-			errorObject["id"] = "no_confirm";
-			errorObject["message"] = "Account confirmation is disabled.";
-			return false;
-		}
-
-		code = request.GetParameter("code");
-
-		NickCoreRef nc = request.session->Account();
-
-		if (!unconfirmedExt->HasExt(nc))
-		{
-			errorObject["id"] = "already_confirmed";
-			errorObject["message"] = "This account is already confirmed";
-			return false;
-		}
-
-		Anope::string* nc_code = passcodeExt->Get(nc);
-
-		if (!nc_code || code != *nc_code)
-		{
-			errorObject["id"] = "wrong_code";
-			errorObject["message"] = "Incorrect confirmation code supplied";
-			return false;
-		}
-
-		APILogger(*this, request) << "Account confirmed: " << nc->display;
-
-		unconfirmedExt->Unset(nc);
-		passcodeExt->Unset(nc);
-		return true;
-	}
-};
-
 class APIIndentifyRequest
 	: public IdentifyRequest
 {
@@ -726,178 +675,6 @@ class AuthTokenEndpoint
 		responseObject["token"] = tokenjson;
 
     APILogger(*this, request) << "SUCCESS: Auth token " << username;
-
-		return true;
-	}
-};
-
-
-class ResetPassEndpoint
-	: public BasicAPIEndpoint
-{
-	EmailTemplate resetmail;
-
-	bool SendResetmail(const NickAliasRef& na)
-	{
-		NickCoreRef nc = na->nc;
-
-		ResetInfo* ri = resetinfo.Require(nc);
-		ri->first = Anope::Random(RESET_CONFIRM_LEN);
-		ri->second = Anope::CurTime;
-
-		EmailMessage msg = resetmail.MakeMessage(na);
-
-		msg.SetVariable("%c", ri->first);
-
-		return Mail::Send(nc, msg.GetSubject(), msg.GetBody());
-	}
-
- public:
-	PrimitiveExtensibleItem<ResetInfo> resetinfo;
-
-	ResetPassEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "resetpass")
-		, resetmail("reset")
-		, resetinfo(Creator, "reset_info")
-	{
-		AddRequiredParam("account");
-		AddRequiredParam("email");
-	}
-
-	void DoReload(Configuration::Conf* conf) anope_override
-	{
-		resetmail.DoReload(conf);
-	}
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		Anope::string account, email;
-
-		account = request.GetParameter("account");
-		email = request.GetParameter("email");
-
-		NickAlias* na = NickAlias::Find(account);
-
-		if (!na)
-			APILogger(*this, request) << "Attempt to reset password for non-existent account '" << account << "'";
-
-		if (na && !na->nc->email.equals_ci(email))
-		{
-			APILogger(*this, request) << "Incorrect email (" << email
-									  << ") for account '" << na->nc->display << "'";
-			na = NULL;
-		}
-
-		if (na && !SendResetmail(na))
-		{
-			errorObject["id"] = "mail_failed";
-			errorObject["message"] = "Unable to send reset email";
-			return false;
-		}
-
-		return true;
-	}
-};
-
-class ResetConfirmEndpoint
-	: public BasicAPIEndpoint
-{
-	const PasswordChecker& passcheck;
-
- public:
-	PrimitiveExtensibleItem<ResetInfo>& resetinfo;
-
-	ResetConfirmEndpoint(Module* Creator, PrimitiveExtensibleItem<ResetInfo>& Resetinfo, const PasswordChecker& Checker)
-		: BasicAPIEndpoint(Creator, "resetpass/confirm")
-		, passcheck(Checker)
-		, resetinfo(Resetinfo)
-	{
-		AddRequiredParam("account");
-		AddRequiredParam("code");
-		AddRequiredParam("newpass");
-	}
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		Anope::string account, code, password;
-
-		account = request.GetParameter("account");
-		code = request.GetParameter("code");
-		password = request.GetParameter("newpass");
-
-		NickAlias* na = NickAlias::Find(account);
-		NickCore* nc;
-
-		if (na)
-			nc = na->nc;
-		else
-		{
-			APILogger(*this, request) << "Attempt to confirm a request for a non-existent account '" << account << "'";
-			nc = NULL;
-		}
-
-		ResetInfo* ri;
-		if (!nc || !(ri = resetinfo.Get(nc)) || ri->first != code)
-		{
-			if (nc)
-				APILogger(*this, request) << "Attempt to confirm a request for '" << account << "' with an invalid code";
-
-			errorObject["id"] = "wrong_code";
-			errorObject["message"] = "Invalid reset token";
-			return false;
-		}
-
-		if (ri->second + 3600 < Anope::CurTime)
-		{
-			APILogger(*this, request) << "Attempt to confirm a request for '" << account << "' with an expired code";
-			errorObject["id"] = "expired_code";
-			errorObject["message"] = "Expired reset token";
-			return false;
-		}
-
-		if (!passcheck.Check(nc->display, password))
-		{
-			errorObject["id"] = "invalid_password";
-			errorObject["message"] = "That password is invalid";
-			return false;
-		}
-
-		Anope::Encrypt(password, nc->pass);
-
-		resetinfo.Unset(nc);
-
-		return true;
-	}
-};
-
-class SetPasswordEndpoint
-	: public BasicAPIEndpoint
-{
-	const PasswordChecker& passcheck;
- public:
-	SetPasswordEndpoint(Module* Creator, const PasswordChecker& Checker)
-		: BasicAPIEndpoint(Creator, "user/set/password")
-		, passcheck(Checker)
-	{
-		RequireSession();
-		AddRequiredParam("newpass");
-	}
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		SessionRef session = request.session;
-
-		Anope::string password = request.GetParameter("newpass");
-		NickCore* nc = session->Account();
-
-		if (!passcheck.Check(nc->display, password))
-		{
-			errorObject["id"] = "invalid_password";
-			errorObject["message"] = "That password is invalid";
-			return false;
-		}
-
-		Anope::Encrypt(password, nc->pass);
 
 		return true;
 	}
@@ -1289,10 +1066,6 @@ class RegisterApiModule
 	PasswordChecker passcheck;
 
 	RegistrationEndpoint reg;
-	ConfirmEndpoint confirm;
-	ResetPassEndpoint resetpass;
-	ResetConfirmEndpoint resetconfirm;
-	SetPasswordEndpoint setpass;
 	AddTokenEndpoint addtoken;
 	DeleteTokenEndpoint deltoken;
 	ListTokensEndpoint listtoken;
@@ -1313,10 +1086,6 @@ class RegisterApiModule
 		: Module(modname, creator, THIRD)
 		, session_type(SESSION_TYPE, Session::Unserialize)
 		, reg(this)
-		, confirm(this)
-		, resetpass(this)
-		, resetconfirm(this, resetpass.resetinfo, passcheck)
-		, setpass(this, passcheck)
 		, addtoken(this)
 		, deltoken(this)
 		, listtoken(this)
@@ -1331,10 +1100,6 @@ class RegisterApiModule
 		this->SetVersion("0.2");
 
 		pages.push_back(&reg);
-		pages.push_back(&confirm);
-		pages.push_back(&resetpass);
-		pages.push_back(&resetconfirm);
-		pages.push_back(&setpass);
 		pages.push_back(&addtoken);
 		pages.push_back(&deltoken);
 		pages.push_back(&listtoken);
