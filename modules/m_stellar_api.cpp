@@ -542,23 +542,23 @@ class AddTagEndpoint
     }
 
 		TagList* list = nc->Require<TagList>("taglist");
+    responseObject["tags"] = list->AsJsonObject();
+
 		Anope::string tagname = request.GetParameter("name");
     Anope::string tagvalue = request.GetParameter("value");	
 
     bool result = list->Set(tagname, tagvalue);
-    if !(result)
+    if (result) {
+      list->Broadcast(nc);
+    }
+    else
     {
 			errorObject["id"] = "invalid_tag";
 			errorObject["message"] = "Failed to add tag";	
 			return false;
     }
-    else
-    {
-		  list->Broadcast(nc);
-    }
-    responseObject["tags"] = list->AsJsonObject();
-
-		return true;
+    
+    return true;
 	}
 };
 
