@@ -1,0 +1,28 @@
+
+APIRequest < HTTPMessage
+APIEndpoint < JsonAPIEndpoint
+
+APILogger < Log
+APILogger::APILogger()
+
+BasicAPIEndpoint < APIEndpoint
+
+AuthTokenEndpoint < BasicAPIEndpoint < APIEndpoint < JsonAPIEndpoint
+
+AddTagEndpoint < BasicAPIEndpoint
+DeleteTagEndpoint < BasicAPIEndpoint
+ListTagsEndpoint < BasicAPIEndpoint
+
+struct TagEntry
+
+struct TagList
+
+TagList::~TagList()
+
+void TagList::Broadcast()
+
+size_t TagList::Find()
+
+RegisterApiModule < RegisterApiModule
+
+MODULE_INIT(RegisterApiModule)
