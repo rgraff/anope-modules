@@ -242,90 +242,14 @@ class BasicAPIEndpoint
 	virtual bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) = 0;
 };
 
-class AuthorizeEndpoint
-  : public BasicAPIEndpoint
-{
- private:
-	ServiceReference<ForbidService> forbidService;
 
- public:
-  AuthorizeEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "authorize")
-		, forbidService("ForbidService", "forbid")
-	{
-		AddRequiredParam("username");
-	}
+/* ****************************************************************************
+ * * 
+ * *            TAG LISTS
+ * *
+ * ****************************************************************************
+ */
 
-  Anope::string GetToken(APIRequest& request, NickCore* nc, const Anope::string& token_name)
-  {
-    // Get our token list
-    AuthTokenList* tokens = GetTokenList(nc, true);
-		if (!tokens)
-      return "tokens_disabled";
-
-    AuthToken* token;
-    token = tokens->FindToken(token_name);
-    if (!token)
-    {
-      token = tokens->NewToken(token_name);
-      APILogger(*this, request) << "token generated for '" << nc->display << "'";
-    }
-    else 
-    {
-      APILogger(*this, request) << "token found for '" << nc->display << "'";
-    }
-
-    return token->GetToken();
-  }
-
-	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
-	{
-		Anope::string username = request.GetParameter("username");
-
-    // Verify nick is not forbidden from reg/usage
-    if (forbidService)
-    {
-      ForbidData* nickforbid = forbidService->FindForbid(username, FT_NICK);
-      ForbidData* regforbid = forbidService->FindForbid(username, FT_REGISTER);
-      if (nickforbid || regforbid)
-      {
-        errorObject["id"] = "forbidden_user";
-        errorObject["message"] = "This nickname is forbidden from registration";
-        return false;
-      }
-    }
-
-    // Find our NickAlias from our username
-    NickAlias* na;
-    NickCore* nc;
-
-    na = NickAlias::Find(username);
-    if (na)
-    {
-      nc = na->nc;
-    }
-    else
-    {
-  		nc = new NickCore(username);
-	  	na = new NickAlias(username, nc);
-      APILogger(*this, request) << "Account created for '" << nc->display << "'";
-    }
-
-    // Generate a token if requested
-    if (request.HasParameter("token"))
-    {
-      Anope::string tokenName = request.GetParameter("token");
-      responseObject["token"] = GetToken(request, nc, tokenName);
-    }
-
-    // Broadcast out the tags
-		TagList* list = nc->Require<TagList>("taglist");
-    list->Broadcast(nc);
-    responseObject["tags"] = list->AsJsonObject();
-
-		return true;
-	}
-};
 
 struct TagEntry;
 
@@ -520,6 +444,99 @@ JsonObject TagList::AsJsonObject()
 	
   return taglist;
 }
+
+
+/* ****************************************************************************
+ * * 
+ * *            END POINTS
+ * *
+ * ****************************************************************************
+ */
+
+class AuthorizeEndpoint
+  : public BasicAPIEndpoint
+{
+ private:
+	ServiceReference<ForbidService> forbidService;
+
+ public:
+  AuthorizeEndpoint(Module* Creator)
+		: BasicAPIEndpoint(Creator, "authorize")
+		, forbidService("ForbidService", "forbid")
+	{
+		AddRequiredParam("username");
+	}
+
+  Anope::string GetToken(APIRequest& request, NickCore* nc, const Anope::string& token_name)
+  {
+    // Get our token list
+    AuthTokenList* tokens = GetTokenList(nc, true);
+		if (!tokens)
+      return "tokens_disabled";
+
+    AuthToken* token;
+    token = tokens->FindToken(token_name);
+    if (!token)
+    {
+      token = tokens->NewToken(token_name);
+      APILogger(*this, request) << "token generated for '" << nc->display << "'";
+    }
+    else 
+    {
+      APILogger(*this, request) << "token found for '" << nc->display << "'";
+    }
+
+    return token->GetToken();
+  }
+
+	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
+	{
+		Anope::string username = request.GetParameter("username");
+
+    // Verify nick is not forbidden from reg/usage
+    if (forbidService)
+    {
+      ForbidData* nickforbid = forbidService->FindForbid(username, FT_NICK);
+      ForbidData* regforbid = forbidService->FindForbid(username, FT_REGISTER);
+      if (nickforbid || regforbid)
+      {
+        errorObject["id"] = "forbidden_user";
+        errorObject["message"] = "This nickname is forbidden from registration";
+        return false;
+      }
+    }
+
+    // Find our NickAlias from our username
+    NickAlias* na;
+    NickCore* nc;
+
+    na = NickAlias::Find(username);
+    if (na)
+    {
+      nc = na->nc;
+    }
+    else
+    {
+  		nc = new NickCore(username);
+	  	na = new NickAlias(username, nc);
+      APILogger(*this, request) << "Account created for '" << nc->display << "'";
+    }
+
+    // Generate a token if requested
+    if (request.HasParameter("token"))
+    {
+      Anope::string tokenName = request.GetParameter("token");
+      responseObject["token"] = GetToken(request, nc, tokenName);
+    }
+
+    // Broadcast out the tags
+		TagList* list = nc->Require<TagList>("taglist");
+    list->Broadcast(nc);
+    responseObject["tags"] = list->AsJsonObject();
+
+		return true;
+	}
+};
 
 class AddTagEndpoint
 	: public BasicAPIEndpoint
