@@ -180,6 +180,9 @@ class APIEndpoint
 			responseObj["error"] = error;
 
 			reply.Write(responseObj.str());
+
+      APILogger(*this, request) << "ERROR missing parameters";
+
 			return true;
 		}
 
@@ -235,15 +238,15 @@ class BasicAPIEndpoint
 	virtual bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) = 0;
 };
 
-class AuthTokenEndpoint
+class AuthorizeEndpoint
   : public BasicAPIEndpoint
 {
  private:
 	ServiceReference<ForbidService> forbidService;
 
  public:
-  AuthTokenEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "authtoken")
+  AuthorizeEndpoint(Module* Creator)
+		: BasicAPIEndpoint(Creator, "authorize")
 		, forbidService("ForbidService", "forbid")
 	{
 		AddRequiredParam("username");
@@ -261,11 +264,11 @@ class AuthTokenEndpoint
     if (!token)
     {
       token = tokens->NewToken(token_name);
-      APILogger(*this, request) << "AuthToken generated for '" << nc->display << "'";
+      APILogger(*this, request) << "token generated for '" << nc->display << "'";
     }
     else 
     {
-      APILogger(*this, request) << "AuthToken found for '" << nc->display << "'";
+      APILogger(*this, request) << "token found for '" << nc->display << "'";
     }
 
     return token->GetToken();
@@ -455,6 +458,20 @@ size_t TagList::Find(const Anope::string& tag_name)
 	return SIZE_MAX;
 }
 
+JsonObject TagList::AsJsonObject(NickCore* nc)
+{
+	TagList* list = nc->Require<TagList>("taglist");
+
+	JsonObject taglist;
+	for (size_t idx = 0; idx < (*list)->size(); ++idx)
+	{
+		TagEntry* tag = (*list)->at(idx);
+		taglist[tag->name] = tag->value;
+  }
+	
+  return taglist;
+}
+
 class AddTagEndpoint
 	: public BasicAPIEndpoint
 {
@@ -600,15 +617,7 @@ class ListTagsEndpoint
 				return false;
     }
   
-		TagList* list = nc->Require<TagList>("taglist");
-
-		JsonObject taglist;
-		for (size_t idx = 0; idx < (*list)->size(); ++idx)
-		{
-			TagEntry* tag = (*list)->at(idx);
-			taglist[tag->name] = tag->value;
-		}
-		responseObject["tags"] = taglist;
+		responseObject["tags"] = TagList::AsJsonObject(nc);
 		return true;
 	}
 };
@@ -625,7 +634,7 @@ class RegisterApiModule
 	DeleteTagEndpoint deltag;
 	ListTagsEndpoint listtags;
 
-  AuthTokenEndpoint authtoken;
+  AuthorizeEndpoint authorize;
 
 	typedef std::vector<APIEndpoint*> PageList;
 	PageList pages;
@@ -638,15 +647,15 @@ class RegisterApiModule
 		, addtag(this)
 		, deltag(this)
 		, listtags(this)
-    , authtoken(this)
+    , authorize(this)
 	{
-		this->SetAuthor("rgraff"); // derivitive of the work of linuxdaemon & others
+		this->SetAuthor("linuxdaemon"); // derivitive of the work of linuxdaemon & others
 		this->SetVersion("0.1");
 
 		pages.push_back(&addtag);
 		pages.push_back(&deltag);
 		pages.push_back(&listtags);
-    pages.push_back(&authtoken);
+    pages.push_back(&authorize);
 	}
 
 	void RegisterPages()
