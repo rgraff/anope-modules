@@ -16,7 +16,7 @@ class APIRequest
  private:
 	const Anope::string client_authorization;
 	const ip_t client_ip;
-
+  
  public:
 
 	APIRequest(const APIRequest& other)
@@ -48,7 +48,8 @@ class APIRequest
     if (client_authorization.empty() || client_ip.empty())
       return false;
 
-    Anope::string secretkey = "Bearer cant-touch-this";
+		Configuration::Block* block = conf->GetModule("m_stellar_api");
+    const Anope::string secret_key = block->Get<const Anope::string>("secretkey", "");
     return (secretkey == client_authorization);
 	}
 
@@ -117,14 +118,12 @@ class APIEndpoint
 {
 	typedef std::set<Anope::string> RequiredParams;
 	RequiredParams required_params;
-	bool need_login;
 
  public:
 	Module* creator;
 
 	APIEndpoint(Module* Creator, const Anope::string& u)
 		: JsonAPIEndpoint(u)
-		, need_login(false)
 		, creator(Creator)
 	{
 	}
@@ -491,7 +490,6 @@ class StellarApiModule
 	AddTagEndpoint addtag;
 	DeleteTagEndpoint deltag;
 	ListTagsEndpoint listtags;
-
   AuthorizeEndpoint authorize;
 
 	typedef std::vector<APIEndpoint*> PageList;
