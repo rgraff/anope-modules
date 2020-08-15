@@ -4,42 +4,37 @@
 #include "third/json_api.h"
 #include "third/m_token_auth.h"
 
-ExtensibleRef<Anope::string> passcodeExt("passcode");
-ExtensibleRef<bool> unconfirmedExt("UNCONFIRMED");
-
 class APIRequest
 	: public HTTPMessage
 {
  public:
+  typedef std::map<Anope::string, Anope::string> HeaderMap;
 	typedef std::map<Anope::string, Anope::string> ParamMap;
 	typedef Anope::string ip_t;
 
  private:
-	const Anope::string client_id;
+	const Anope::string client_authorization;
 	const ip_t client_ip;
-	const ip_t user_ip;
 
  public:
 
 	APIRequest(const APIRequest& other)
 		: HTTPMessage(other)
-		, client_id(other.client_id)
+		, client_authorization(other.client_authorization)
 		, client_ip(other.client_ip)
-		, user_ip(other.user_ip)
-	{
+  {
 	}
 
 	APIRequest(const HTTPMessage& message, const ip_t& ClientIP)
 		: HTTPMessage(message)
-		, client_id(GetParameter("client_id"))
+		, client_authorization(GetHeader("Authorization"))
 		, client_ip(ClientIP)
-		, user_ip(GetParameter("user_ip"))
 	{
 	}
 
-	const Anope::string& getClientId() const
+	const Anope::string& getClientAuthorization() const
 	{
-		return client_id;
+		return client_authorization;
 	}
 
 	const ip_t& getClientIp() const
@@ -47,16 +42,37 @@ class APIRequest
 		return client_ip;
 	}
 
-	const ip_t& getUserIp() const
-	{
-		return user_ip;
-	}
-
 	bool IsValid() const
 	{
-		return !(client_id.empty() || client_ip.empty());
+		return !(client_authorization.empty() || client_ip.empty());
 	}
 
+  // Header access helpers
+	bool HasHeader(const HeaderMap::key_type& name) const
+	{
+		return headers.find(name) != headers.end();
+	}
+
+	bool GetHeader(const HeaderMap::key_type& name, HeaderMap::mapped_type& value) const
+	{
+		HeaderMap::const_iterator it = headers.find(name);
+
+		if (it == headers.end())
+			return false;
+
+		value = it->second;
+
+		return true;
+	}
+  
+  HeaderMap::mapped_type GetHeader(const HeaderMap::key_type& name) const
+	{
+		HeaderMap::mapped_type value;
+		GetHeader(name, value);
+		return value;
+	}
+
+  // Parameter access helpers
 	bool HasParameter(const ParamMap::key_type& name) const
 	{
 		return post_data.find(name) != post_data.end();
@@ -170,13 +186,7 @@ class APIEndpoint
 APILogger::APILogger(const APIEndpoint& endpoint, const APIRequest& request)
 	: Log(LOG_NORMAL, endpoint.GetEndpointID())
 {
-	*this << "API: " << category << " from " << request.getClientId()
-		  << " on " << request.getClientIp();
-
-	if (!request.getUserIp().empty())
-		*this << " (user: " << request.getUserIp() << ")";
-
-	*this << ": ";
+	*this << "API: " << category << " from " << request.getClientIp() << ": "
 }
 
 class BasicAPIEndpoint
