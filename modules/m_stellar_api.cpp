@@ -337,7 +337,8 @@ struct TagList : Serialize::Checker<std::vector<TagEntry*> >
 	}
 
 	~TagList();
-  bool Set(Anope::string& name, Anope::string& value);
+  bool SetTag(Anope::string& name, Anope::string& value);
+  bool DelTag(Anope::string& name);
 	void Broadcast(NickCore* nc);
   JsonObject AsJsonObject();
 	size_t Find(const Anope::string& name);
@@ -411,7 +412,17 @@ TagList::~TagList()
 		delete (*this)->at(i);
 }
 
-bool TagList::Set(Anope::string& name, Anope::string& value)
+bool TagList::DelTag(Anope::string& name)
+{
+		size_t listidx = list->Find(name);
+		if (listidx > (*list)->size())
+		  return false;
+	
+		(*list)->erase((*list)->begin() + listidx);
+    return true;
+}
+
+bool TagList::SetTag(Anope::string& name, Anope::string& value)
 {
   for (Anope::string::const_iterator iter = name.begin(); iter != name.end(); ++iter)
 		{
@@ -593,18 +604,18 @@ class DeleteTagEndpoint
     }
 
 		TagList* list = nc->Require<TagList>("taglist");
-
-		size_t listidx = list->Find(request.GetParameter("name"));
-		if (listidx > (*list)->size())
-		{
+    bool result = list->DelTag(request.GetParameter("name"));
+    if (result)
+    {
+      list->Broadcast(nc);
+    }
+    else
+    {
 			// We can't delete a non-existent tag.
 			errorObject["id"] = "no_tag";
 			errorObject["message"] = "No matching tag found.";	
 			return false;
-		}
-	
-		(*list)->erase((*list)->begin() + listidx);
-		list->Broadcast(nc);
+    }
 
     responseObject["tags"] = list->AsJsonObject();
 
