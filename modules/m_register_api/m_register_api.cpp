@@ -329,7 +329,7 @@ struct TagList : Serialize::Checker<std::vector<TagEntry*> >
 
 	~TagList();
 	void Broadcast(NickCore* nc);
-  JsonObject TagList::AsJsonObject(NickCore* nc);
+  JsonObject AsJsonObject();
 	size_t Find(const Anope::string& name);
 };
 
@@ -459,14 +459,12 @@ size_t TagList::Find(const Anope::string& tag_name)
 	return SIZE_MAX;
 }
 
-JsonObject TagList::AsJsonObject(NickCore* nc)
+JsonObject TagList::AsJsonObject()
 {
-	TagList* list = nc->Require<TagList>("taglist");
-
 	JsonObject taglist;
-	for (size_t idx = 0; idx < (*list)->size(); ++idx)
+	for (size_t idx = 0; idx < (*this)->size(); ++idx)
 	{
-		TagEntry* tag = (*list)->at(idx);
+		TagEntry* tag = (*this)->at(idx);
 		taglist[tag->name] = tag->value;
   }
 	
@@ -537,6 +535,8 @@ class AddTagEndpoint
 			(*list)->push_back(tag);
 		}
 
+    responseObject["tags"] = list->AsJsonObject();
+
 		list->Broadcast(nc);
 		return true;
 	}
@@ -585,6 +585,9 @@ class DeleteTagEndpoint
 	
 		(*list)->erase((*list)->begin() + listidx);
 		list->Broadcast(nc);
+
+    responseObject["tags"] = list->AsJsonObject();
+
 		return true;
 	}
 };
@@ -617,8 +620,9 @@ class ListTagsEndpoint
 				errorObject["message"] = "Username does not exist";	
 				return false;
     }
-  
-		responseObject["tags"] = TagList::AsJsonObject(nc);
+  	
+    TagList* list = nc->Require<TagList>("taglist");
+		responseObject["tags"] = list->AsJsonObject();
 		return true;
 	}
 };
