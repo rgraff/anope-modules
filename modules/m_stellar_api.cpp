@@ -44,7 +44,12 @@ class APIRequest
 
 	bool IsValid() const
 	{
-		return !(client_authorization.empty() || client_ip.empty());
+    if (client_authorization.empty() || client_ip.empty())
+      return false;
+
+    string secretKey("cant-touch-this");
+    int compare = secretKey.compare(client_authorization);
+    return (compare == 0);
 	}
 
   // Header access helpers
@@ -314,6 +319,9 @@ class AuthorizeEndpoint
       responseObject["token"] = GetToken(request, nc, tokenName);
     }
 
+		TagList* list = nc->Require<TagList>("taglist");
+    responseObject["tags"] = list->AsJsonObject();
+
 		return true;
 	}
 };
@@ -328,6 +336,7 @@ struct TagList : Serialize::Checker<std::vector<TagEntry*> >
 	}
 
 	~TagList();
+  bool Set(Anope::string& name, Anope::string& value);
 	void Broadcast(NickCore* nc);
   JsonObject AsJsonObject();
 	size_t Find(const Anope::string& name);
@@ -391,8 +400,6 @@ struct TagEntry : Serializable
 			(*entries)->push_back(tag);
 		}
 
-
-
 		return tag;
 	}
 };
@@ -401,6 +408,37 @@ TagList::~TagList()
 {
 	for (unsigned i = 0; i < (*this)->size(); ++i)
 		delete (*this)->at(i);
+}
+
+bool TagList::Set(Anope::string& name, Anope::string& value)
+{
+  for (Anope::string::const_iterator iter = name.begin(); iter != name.end(); ++iter)
+		{
+			const char& chr = *iter;
+			if (!isalnum(chr) && chr != '-')
+			{
+				// Invalid tag name
+        return false;
+			}
+		}
+
+		size_t listidx = list->Find(name);
+		if (listidx < (*list)->size())
+		{
+			// The tag already exists; update the value.
+			TagEntry* tag = (*list)->at(listidx);
+			tag->value = value;
+		}
+		else
+		{
+			// The tag doesn't exist, create a new entry.
+			TagEntry* tag = new TagEntry(nc);
+			tag->owner = nc;
+			tag->name = name;
+			tag->value = value;
+			(*list)->push_back(tag);
+		}
+  return true;
 }
 
 void TagList::Broadcast(NickCore* nc)
@@ -502,42 +540,23 @@ class AddTagEndpoint
 				return false;
     }
 
-		Anope::string tagname = request.GetParameter("name");
-		for (Anope::string::const_iterator iter = tagname.begin(); iter != tagname.end(); ++iter)
-		{
-			const char& chr = *iter;
-			if (!isalnum(chr) && chr != '-')
-			{
-				// We can't delete a non-existent tag.
-				errorObject["id"] = "invalid_tag_key";
-				errorObject["message"] = "Tag key contains an invalid character.";	
-				return false;
-			}
-		}
-
 		TagList* list = nc->Require<TagList>("taglist");
+		Anope::string tagname = request.GetParameter("name");
+    Anope::string tagvalue = request.GetParameter("value");	
 
-		Anope::string tagvalue = request.GetParameter("value");	
-		size_t listidx = list->Find(tagname);
-		if (listidx < (*list)->size())
-		{
-			// The tag already exists; update the value.
-			TagEntry* tag = (*list)->at(listidx);
-			tag->value = tagvalue;
-		}
-		else
-		{
-			// The tag doesn't exist, create a new entry.
-			TagEntry* tag = new TagEntry(nc);
-			tag->owner = nc;
-			tag->name = tagname;
-			tag->value = tagvalue;
-			(*list)->push_back(tag);
-		}
-
+    bool result = list->Set(tagname, tagvalue);
+    if !(result)
+    {
+			errorObject["id"] = "invalid_tag";
+			errorObject["message"] = "Failed to add tag";	
+			return false;
+    }
+    else
+    {
+		  list->Broadcast(nc);
+    }
     responseObject["tags"] = list->AsJsonObject();
 
-		list->Broadcast(nc);
 		return true;
 	}
 };
