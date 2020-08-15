@@ -142,6 +142,17 @@ class APIEndpoint
 		if (!request.IsValid())
 		{
 			reply.error = HTTP_BAD_REQUEST;
+      
+      JsonObject error;
+			error["id"] = "unauthorized";
+			error["message"] = "Request unauthorized";
+
+			JsonObject responseObj;
+			responseObj["status"] = "error";
+			responseObj["error"] = error;
+
+			reply.Write(responseObj.str());
+
 			return true;
 		}
 
