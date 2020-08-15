@@ -1,6 +1,8 @@
 #ifndef ANOPE_TAGS_H
 #define ANOPE_TAGS_H
 
+#include "third/json_api.h"
+
 struct TagEntry;
 
 struct TagList : Serialize::Checker<std::vector<TagEntry*> >
