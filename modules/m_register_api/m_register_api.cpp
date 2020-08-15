@@ -329,6 +329,7 @@ struct TagList : Serialize::Checker<std::vector<TagEntry*> >
 
 	~TagList();
 	void Broadcast(NickCore* nc);
+  JsonObject TagList::AsJsonObject(NickCore* nc);
 	size_t Find(const Anope::string& name);
 };
 
@@ -692,6 +693,10 @@ class RegisterApiModule
 	{
 		Configuration::Block* block = conf->GetModule(this);
 		UnregisterPages();
+
+    const Anope::string secret_key = block->Get<const Anope::string>("secretkey", "");
+    if (secret_key.empty())
+			throw ConfigException("Unable to find secretkey in module configuration");    
 
 		const Anope::string provider = block->Get<const Anope::string>("server", "httpd/main");
 		this->httpd = ServiceReference<HTTPProvider>("HTTPProvider", provider);
