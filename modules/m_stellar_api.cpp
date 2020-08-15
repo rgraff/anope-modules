@@ -116,7 +116,7 @@ class APIEndpoint
 {
 	typedef std::set<Anope::string> RequiredParams;
 	RequiredParams required_params;
-  const Anope::string authorization
+  const Anope::string authorization;
 
  public:
 	Module* creator;
@@ -208,8 +208,7 @@ class APIEndpoint
 		return true;
 	}
 
-	virtual bool HandleRequest(HTTPProvider* provider, const Anope::string& string, HTTPClient* client,
-							   APIRequest& request, HTTPReply& reply) = 0;
+  virtual bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) = 0;
 
 	virtual void DoReload(Configuration::Conf* conf)
 	{
