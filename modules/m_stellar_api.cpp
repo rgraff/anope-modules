@@ -47,7 +47,7 @@ class APIRequest
     if (client_authorization.empty() || client_ip.empty())
       return false;
 
-    Anope::string secretkey = "cant-touch-this";
+    Anope::string secretkey = "Bearer cant-touch-this";
     return (secretkey == client_authorization);
 	}
 
@@ -264,6 +264,7 @@ struct TagList : Serialize::Checker<std::vector<TagEntry*> >
   bool SetTag(NickCore* nc, Anope::string& name, Anope::string& value);
   bool DelTag(Anope::string& name);
 	void Broadcast(NickCore* nc);
+  void Clear(NickCore* nc);
   JsonObject AsJsonObject();
 	size_t Find(const Anope::string& name);
 };
@@ -344,6 +345,14 @@ bool TagList::DelTag(Anope::string& tagname)
 	
 		(*this)->erase((*this)->begin() + listidx);
     return true;
+}
+
+void TagList::Clear()
+{
+  for (size_t idx = 0; idx < (*this)->size(); ++idx)
+	{
+    (*this)->erase((*this)->begin() + idx);
+	}
 }
 
 bool TagList::SetTag(NickCore* nc, Anope::string& tagname, Anope::string& tagvalue)
@@ -654,6 +663,7 @@ class ListTagsEndpoint
 	bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) anope_override
 	{
     Anope::string username = request.GetParameter("username");
+    bool clear = request.HasParameter("clear");
 
 		NickAlias* na;
     NickCore* nc;
@@ -671,6 +681,9 @@ class ListTagsEndpoint
     }
   	
     TagList* list = nc->Require<TagList>("taglist");
+    if (clear) 
+      list->Clear();
+
 		responseObject["tags"] = list->AsJsonObject();
 		return true;
 	}
