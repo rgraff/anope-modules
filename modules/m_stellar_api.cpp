@@ -48,7 +48,7 @@ class APIRequest
       return false;
 
     Anope::string secretkey = "cant-touch-this";
-    return (secretkey.compare(client_authorization) == 0);
+    return (secretkey == client_authorization);
 	}
 
   // Header access helpers
