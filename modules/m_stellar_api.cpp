@@ -261,7 +261,7 @@ struct TagList : Serialize::Checker<std::vector<TagEntry*> >
 	}
 
 	~TagList();
-  bool SetTag(Anope::string& name, Anope::string& value);
+  bool SetTag(NickCore* nc, Anope::string& name, Anope::string& value);
   bool DelTag(Anope::string& name);
 	void Broadcast(NickCore* nc);
   JsonObject AsJsonObject();
@@ -338,7 +338,7 @@ TagList::~TagList()
 
 bool TagList::DelTag(Anope::string& tagname)
 {
-		size_t listidx = *this->Find(tagname);
+		size_t listidx = this->Find(tagname);
 		if (listidx > (*this)->size())
 		  return false;
 	
@@ -346,7 +346,7 @@ bool TagList::DelTag(Anope::string& tagname)
     return true;
 }
 
-bool TagList::SetTag(Anope::string& tagname, Anope::string& tagvalue)
+bool TagList::SetTag(NickCore* nc, Anope::string& tagname, Anope::string& tagvalue)
 {
   for (Anope::string::const_iterator iter = tagname.begin(); iter != tagname.end(); ++iter)
 		{
@@ -358,7 +358,7 @@ bool TagList::SetTag(Anope::string& tagname, Anope::string& tagvalue)
 			}
 		}
 
-		size_t listidx = list->Find(name);
+		size_t listidx = this->Find(tagname);
 		if (listidx < (*this)->size())
 		{
 			// The tag already exists; update the value.
@@ -575,7 +575,7 @@ class AddTagEndpoint
 		Anope::string tagname = request.GetParameter("name");
     Anope::string tagvalue = request.GetParameter("value");	
 
-    bool result = list->Set(tagname, tagvalue);
+    bool result = list->SetTag(nc, tagname, tagvalue);
     if (result) {
       list->Broadcast(nc);
     }
