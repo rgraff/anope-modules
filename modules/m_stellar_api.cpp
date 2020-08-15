@@ -213,7 +213,7 @@ class APIEndpoint
 	virtual void DoReload(Configuration::Conf* conf)
 	{
     Configuration::Block* block = conf->GetModule("m_stellar_api");
-    authorization = << block->Get<const Anope::string>("authorization", "");
+    authorization = block->Get<const Anope::string>("authorization", "");
 	}
 };
 
