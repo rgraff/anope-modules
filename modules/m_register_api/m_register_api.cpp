@@ -186,7 +186,7 @@ class APIEndpoint
 APILogger::APILogger(const APIEndpoint& endpoint, const APIRequest& request)
 	: Log(LOG_NORMAL, endpoint.GetEndpointID())
 {
-	*this << "API: " << category << " from " << request.getClientIp() << ": "
+	*this << "API: " << category << " from " << request.getClientIp() << ": ";
 }
 
 class BasicAPIEndpoint
@@ -429,14 +429,14 @@ void TagList::Broadcast(NickCore* nc)
 		UplinkSocket::Message(Me) << "METADATA " << (*it)->GetUID() << " custom-tags :" << encodedtags;
 }
 
-size_t TagList::Find(const Anope::string& name)
+size_t TagList::Find(const Anope::string& tag_name)
 {
 	// It would be nice if we could use an iterator here but the serialization API
 	// sadly hides the typedefs necessary to use it with old style for loops.
 	for (size_t idx = 0; idx < (*this)->size(); ++idx)
 	{
 		TagEntry* entry = (*this)->at(idx);
-		if (entry->name == name)
+		if (entry->name == tag_name)
 			return idx;
 	}
 	return SIZE_MAX;
