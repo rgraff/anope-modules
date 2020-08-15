@@ -264,7 +264,7 @@ struct TagList : Serialize::Checker<std::vector<TagEntry*> >
   bool SetTag(NickCore* nc, Anope::string& name, Anope::string& value);
   bool DelTag(Anope::string& name);
 	void Broadcast(NickCore* nc);
-  void Clear(NickCore* nc);
+  void Clear();
   JsonObject AsJsonObject();
 	size_t Find(const Anope::string& name);
 };
