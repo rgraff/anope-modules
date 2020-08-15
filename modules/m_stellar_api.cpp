@@ -336,19 +336,19 @@ TagList::~TagList()
 		delete (*this)->at(i);
 }
 
-bool TagList::DelTag(Anope::string& name)
+bool TagList::DelTag(Anope::string& tagname)
 {
-		size_t listidx = list->Find(name);
-		if (listidx > (*list)->size())
+		size_t listidx = *this->Find(tagname);
+		if (listidx > (*this)->size())
 		  return false;
 	
-		(*list)->erase((*list)->begin() + listidx);
+		(*this)->erase((*this)->begin() + listidx);
     return true;
 }
 
-bool TagList::SetTag(Anope::string& name, Anope::string& value)
+bool TagList::SetTag(Anope::string& tagname, Anope::string& tagvalue)
 {
-  for (Anope::string::const_iterator iter = name.begin(); iter != name.end(); ++iter)
+  for (Anope::string::const_iterator iter = tagname.begin(); iter != tagname.end(); ++iter)
 		{
 			const char& chr = *iter;
 			if (!isalnum(chr) && chr != '-')
@@ -359,20 +359,20 @@ bool TagList::SetTag(Anope::string& name, Anope::string& value)
 		}
 
 		size_t listidx = list->Find(name);
-		if (listidx < (*list)->size())
+		if (listidx < (*this)->size())
 		{
 			// The tag already exists; update the value.
-			TagEntry* tag = (*list)->at(listidx);
-			tag->value = value;
+			TagEntry* tag = (*this)->at(listidx);
+			tag->value = tagvalue;
 		}
 		else
 		{
 			// The tag doesn't exist, create a new entry.
 			TagEntry* tag = new TagEntry(nc);
 			tag->owner = nc;
-			tag->name = name;
-			tag->value = value;
-			(*list)->push_back(tag);
+			tag->name = tagname;
+			tag->value = tagvalue;
+			(*this)->push_back(tag);
 		}
   return true;
 }
