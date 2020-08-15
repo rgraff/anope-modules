@@ -116,7 +116,7 @@ class APIEndpoint
 {
 	typedef std::set<Anope::string> RequiredParams;
 	RequiredParams required_params;
-  const Anope::string authorization;
+  Anope::string authorization;
 
  public:
 	Module* creator;
