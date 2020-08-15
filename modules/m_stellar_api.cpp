@@ -191,36 +191,6 @@ class APIEndpoint
 		}
 
 		APILogger(*this, request) << "Request received";
-
-		return HandleRequest(provider, string, client, request, reply);
-	}
-
-	virtual bool HandleRequest(HTTPProvider* provider, const Anope::string& string, HTTPClient* client,
-							   APIRequest& request, HTTPReply& reply) = 0;
-
-	virtual void DoReload(Configuration::Conf* conf)
-	{
-	}
-};
-
-APILogger::APILogger(const APIEndpoint& endpoint, const APIRequest& request)
-	: Log(LOG_NORMAL, endpoint.GetEndpointID())
-{
-	*this << "API: " << category << " from " << request.getClientIp() << ": ";
-}
-
-class BasicAPIEndpoint
-	: public APIEndpoint
-{
- public:
-	BasicAPIEndpoint(Module* Creator, const Anope::string& u)
-		: APIEndpoint(Creator, u)
-	{
-	}
-
-	bool HandleRequest(HTTPProvider* provider, const Anope::string& string, HTTPClient* client, APIRequest& request,
-					   HTTPReply& reply) anope_override
-	{
 		JsonObject responseObject, errorObject;
 
 		if (!HandleRequest(request, responseObject, errorObject))
@@ -239,8 +209,19 @@ class BasicAPIEndpoint
 		return true;
 	}
 
-	virtual bool HandleRequest(APIRequest& request, JsonObject& responseObject, JsonObject& errorObject) = 0;
+	virtual bool HandleRequest(HTTPProvider* provider, const Anope::string& string, HTTPClient* client,
+							   APIRequest& request, HTTPReply& reply) = 0;
+
+	virtual void DoReload(Configuration::Conf* conf)
+	{
+	}
 };
+
+APILogger::APILogger(const APIEndpoint& endpoint, const APIRequest& request)
+	: Log(LOG_NORMAL, endpoint.GetEndpointID())
+{
+	*this << "API: " << category << " from " << request.getClientIp() << ": ";
+}
 
 
 
@@ -252,14 +233,14 @@ class BasicAPIEndpoint
  */
 
 class AuthorizeEndpoint
-  : public BasicAPIEndpoint
+  : public APIEndpoint
 {
  private:
 	ServiceReference<ForbidService> forbidService;
 
  public:
   AuthorizeEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "authorize")
+		: APIEndpoint(Creator, "authorize")
 		, forbidService("ForbidService", "forbid")
 	{
 		AddRequiredParam("username");
@@ -337,11 +318,11 @@ class AuthorizeEndpoint
 };
 
 class AddTagEndpoint
-	: public BasicAPIEndpoint
+	: public APIEndpoint
 {
  public:
 	AddTagEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "tags/add")
+		: APIEndpoint(Creator, "tags/add")
 	{
 		AddRequiredParam("username");
 		AddRequiredParam("name");
@@ -390,11 +371,11 @@ class AddTagEndpoint
 };
 
 class DeleteTagEndpoint
-	: public BasicAPIEndpoint
+	: public APIEndpoint
 {
  public:
 	DeleteTagEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "tags/delete")
+		: APIEndpoint(Creator, "tags/delete")
 	{
 		AddRequiredParam("username");
 		AddRequiredParam("name");
@@ -441,11 +422,11 @@ class DeleteTagEndpoint
 };
 
 class ListTagsEndpoint
-	: public BasicAPIEndpoint
+	: public APIEndpoint
 {
  public:
 	ListTagsEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "tags")
+		: APIEndpoint(Creator, "tags")
 	{
     AddRequiredParam("username");
   }
