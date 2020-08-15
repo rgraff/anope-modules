@@ -47,9 +47,8 @@ class APIRequest
     if (client_authorization.empty() || client_ip.empty())
       return false;
 
-    string secretKey("cant-touch-this");
-    int compare = secretKey.compare(client_authorization);
-    return (compare == 0);
+    Anope::string secretkey = "cant-touch-this";
+    return (secretkey.compare(client_authorization) == 0);
 	}
 
   // Header access helpers
@@ -319,7 +318,9 @@ class AuthorizeEndpoint
       responseObject["token"] = GetToken(request, nc, tokenName);
     }
 
+    // Broadcast out the tags
 		TagList* list = nc->Require<TagList>("taglist");
+    list->Broadcast(nc);
     responseObject["tags"] = list->AsJsonObject();
 
 		return true;
