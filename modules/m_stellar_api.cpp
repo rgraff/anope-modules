@@ -156,7 +156,7 @@ class APIEndpoint
 
 			reply.Write(responseObj.str());
 
-		  APILogger(*this, request) << "UNAUTHORIZED ";
+		  APILogger(*this, request) << "UNAUTHORIZED " << authorization;
 
 			return true;
 		}
