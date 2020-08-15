@@ -543,7 +543,7 @@ class AddTagEndpoint
 {
  public:
 	AddTagEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "user/tags/add")
+		: BasicAPIEndpoint(Creator, "tags/add")
 	{
 		AddRequiredParam("username");
 		AddRequiredParam("name");
@@ -595,7 +595,7 @@ class DeleteTagEndpoint
 {
  public:
 	DeleteTagEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "user/tags/delete")
+		: BasicAPIEndpoint(Creator, "tags/delete")
 	{
 		AddRequiredParam("username");
 		AddRequiredParam("name");
@@ -619,9 +619,10 @@ class DeleteTagEndpoint
 				errorObject["message"] = "Username does not exist";	
 				return false;
     }
-
+    
+    Anope::string tagname = request.GetParameter("name");
 		TagList* list = nc->Require<TagList>("taglist");
-    bool result = list->DelTag(request.GetParameter("name"));
+    bool result = list->DelTag(tagname);
     if (result)
     {
       list->Broadcast(nc);
@@ -645,7 +646,7 @@ class ListTagsEndpoint
 {
  public:
 	ListTagsEndpoint(Module* Creator)
-		: BasicAPIEndpoint(Creator, "user/tags/list")
+		: BasicAPIEndpoint(Creator, "tags")
 	{
     AddRequiredParam("username");
   }
