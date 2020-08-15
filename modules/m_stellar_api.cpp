@@ -43,13 +43,11 @@ class APIRequest
 		return client_ip;
 	}
 
-	bool IsValid() const
+	bool IsValid(Anope::string secretkey) const
 	{
     if (client_authorization.empty() || client_ip.empty())
       return false;
 
-		Configuration::Block* block = conf->GetModule("m_stellar_api");
-    const Anope::string secret_key = block->Get<const Anope::string>("secretkey", "");
     return (secretkey == client_authorization);
 	}
 
@@ -118,6 +116,7 @@ class APIEndpoint
 {
 	typedef std::set<Anope::string> RequiredParams;
 	RequiredParams required_params;
+  const Anope::string secretkey
 
  public:
 	Module* creator;
@@ -143,7 +142,7 @@ class APIEndpoint
 	{
 		APIRequest request(message, client->GetIP());
 
-		if (!request.IsValid())
+		if (!request.IsValid(secretkey))
 		{
 			reply.error = HTTP_BAD_REQUEST;
       
@@ -214,6 +213,8 @@ class APIEndpoint
 
 	virtual void DoReload(Configuration::Conf* conf)
 	{
+    Configuration::Block* block = conf->GetModule("m_stellar_api");
+    secretkey = "Bearer " << block->Get<const Anope::string>("secretkey", "");
 	}
 };
 
