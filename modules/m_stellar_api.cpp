@@ -214,7 +214,7 @@ class APIEndpoint
 	virtual void DoReload(Configuration::Conf* conf)
 	{
     Configuration::Block* block = conf->GetModule("m_stellar_api");
-    secretkey = "Bearer " << block->Get<const Anope::string>("secretkey", "");
+    secretkey = << block->Get<const Anope::string>("secretkey", "");
 	}
 };
 
