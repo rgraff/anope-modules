@@ -43,12 +43,12 @@ class APIRequest
 		return client_ip;
 	}
 
-	bool IsValid(Anope::string secretkey) const
+	bool IsValid(Anope::string authorization) const
 	{
     if (client_authorization.empty() || client_ip.empty())
       return false;
 
-    return (secretkey == client_authorization);
+    return (authorization == client_authorization);
 	}
 
   // Header access helpers
@@ -116,7 +116,7 @@ class APIEndpoint
 {
 	typedef std::set<Anope::string> RequiredParams;
 	RequiredParams required_params;
-  const Anope::string secretkey
+  const Anope::string authorization
 
  public:
 	Module* creator;
@@ -142,7 +142,7 @@ class APIEndpoint
 	{
 		APIRequest request(message, client->GetIP());
 
-		if (!request.IsValid(secretkey))
+		if (!request.IsValid(authorization))
 		{
 			reply.error = HTTP_BAD_REQUEST;
       
@@ -214,7 +214,7 @@ class APIEndpoint
 	virtual void DoReload(Configuration::Conf* conf)
 	{
     Configuration::Block* block = conf->GetModule("m_stellar_api");
-    secretkey = << block->Get<const Anope::string>("secretkey", "");
+    authorization = << block->Get<const Anope::string>("authorization", "");
 	}
 };
 
@@ -531,9 +531,9 @@ class StellarApiModule
 		Configuration::Block* block = conf->GetModule(this);
 		UnregisterPages();
 
-    const Anope::string secret_key = block->Get<const Anope::string>("secretkey", "");
-    if (secret_key.empty())
-			throw ConfigException("Unable to find secretkey in module configuration");    
+    const Anope::string authorization = block->Get<const Anope::string>("authorization", "");
+    if (authorization.empty())
+			throw ConfigException("Unable to find authorization in module configuration");    
 
 		const Anope::string provider = block->Get<const Anope::string>("server", "httpd/main");
 		this->httpd = ServiceReference<HTTPProvider>("HTTPProvider", provider);
